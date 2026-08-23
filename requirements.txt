@@ -1,0 +1,7 @@
+python-chess>=1.999
+torch>=2.2
+numpy>=1.26
+tqdm>=4.66
+requests>=2.31
+zstandard>=0.22
+pyyaml>=6.0

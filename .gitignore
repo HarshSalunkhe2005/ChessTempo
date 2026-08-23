@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# training data and artifacts are large — never commit these
+data/*.pgn
+data/*.pgn.zst
+data/*.npz
+data/*.npy
+checkpoints/
+*.pt
+*.ckpt
+
+.DS_Store
+.idea/
+.vscode/
