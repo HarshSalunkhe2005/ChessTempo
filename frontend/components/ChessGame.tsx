@@ -5,6 +5,13 @@ import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { api, HintResponse, ProfileResponse } from "@/lib/api";
 
+const DIFFICULTY_LABELS: Record<string, string> = {
+  beginner: "Beginner",
+  casual: "Casual",
+  club: "Club",
+  strong: "Strong",
+};
+
 export default function ChessGame() {
   // useMemo so we get one persistent Chess instance across renders, not a
   // fresh game every re-render.
@@ -14,6 +21,7 @@ export default function ChessGame() {
   const [hint, setHint] = useState<HintResponse | null>(null);
   const [status, setStatus] = useState<string>("Your move.");
   const [thinking, setThinking] = useState(false);
+  const [hintLoading, setHintLoading] = useState(false);
 
   useEffect(() => {
     api.getProfile().then(setProfile).catch((e) => setStatus(`Couldn't load profile: ${e.message}`));
@@ -68,33 +76,40 @@ export default function ChessGame() {
   );
 
   const requestHint = useCallback(() => {
-    api.getHint(game.fen()).then(setHint).catch((e) => setStatus(`Couldn't get hint: ${e.message}`));
+    setHintLoading(true);
+    api
+      .getHint(game.fen())
+      .then(setHint)
+      .catch((e) => setStatus(`Couldn't get hint: ${e.message}`))
+      .finally(() => setHintLoading(false));
   }, [game]);
 
   return (
-    <div style={{ display: "flex", gap: 24, padding: 24, flexWrap: "wrap" }}>
-      <div style={{ width: 420, maxWidth: "90vw" }}>
+    <div className="game-layout">
+      <div className="board-wrap">
         <Chessboard position={fen} onPieceDrop={onDrop} arePiecesDraggable={!thinking} />
       </div>
 
-      <div style={{ minWidth: 240 }}>
-        <h2>ChessTempo</h2>
-        <p>{status}</p>
+      <div className="side-panel">
+        <h1>ChessTempo</h1>
+        <p className="status-line">{thinking && <span className="spinner" />}{status}</p>
 
         {profile && (
-          <p>
-            Difficulty: {profile.starting_difficulty} (strength {profile.strength.toFixed(2)}) ·{" "}
-            {profile.games_played} games played
-          </p>
+          <div className="stat-row">
+            <span className="badge">{DIFFICULTY_LABELS[profile.starting_difficulty] ?? profile.starting_difficulty}</span>
+            <span className="badge">strength {profile.strength.toFixed(2)}</span>
+            <span className="badge">{profile.games_played} games played</span>
+          </div>
         )}
 
-        <button onClick={requestHint} disabled={thinking}>
-          Get a hint
+        <button className="btn btn-secondary" onClick={requestHint} disabled={thinking || hintLoading}>
+          {hintLoading && <span className="spinner" />}
+          {hintLoading ? "Thinking..." : "Get a hint"}
         </button>
 
         {hint && (
-          <div style={{ marginTop: 12 }}>
-            {hint.eval_cp !== null && <p>Eval: {(hint.eval_cp / 100).toFixed(2)}</p>}
+          <div className="hint-panel">
+            {hint.eval_cp !== null && <p className="hint-eval">Eval: {(hint.eval_cp / 100).toFixed(2)}</p>}
             {hint.motifs.length === 0 && <p>Nothing jumps out — solid position.</p>}
             {hint.motifs.map((m, i) => (
               <p key={i}>⚠️ {m.description}</p>
