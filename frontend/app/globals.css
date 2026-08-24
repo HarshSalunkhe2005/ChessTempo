@@ -256,31 +256,94 @@ form .field:nth-of-type(3) {
   max-width: 100%;
 }
 
+.board-with-eval {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.eval-bar {
+  width: 16px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1a1d24;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.eval-bar-fill {
+  background: #e9e9e9;
+  transition: height 0.4s ease;
+}
+
 .board-wrap {
   position: relative;
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
+  flex: 1;
 }
 
 .player-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 8px 4px;
   font-size: 14px;
 }
 
-.player-name {
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.avatar-bot {
+  background: linear-gradient(135deg, #3a3f4d, #262b38);
+  color: var(--accent);
+}
+
+.avatar-user {
+  background: linear-gradient(135deg, var(--accent), #b8863a);
+  color: var(--accent-text);
+}
+
+.player-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.player-name {
   font-weight: 600;
 }
 
-.player-glyph {
-  color: var(--accent);
-  font-size: 18px;
+.rating {
+  font-weight: 400;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.clock-pill {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 15px;
+  color: var(--text-dim);
+  flex-shrink: 0;
 }
 
 .captured-row {
@@ -366,9 +429,13 @@ form .field:nth-of-type(3) {
 .move-row {
   display: flex;
   gap: 10px;
-  padding: 3px 0;
+  padding: 5px 6px;
   font-size: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.move-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .move-num {

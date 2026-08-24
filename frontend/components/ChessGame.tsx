@@ -24,6 +24,29 @@ const PIECE_GLYPH: Record<string, string> = {
 
 const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 
+const FIGURINE: Record<string, string> = { N: "♞", B: "♝", R: "♜", Q: "♛", K: "♚" };
+
+/** SAN like "Nf3" -> "♞f3" — figurine notation, as used in most move lists. */
+function toFigurine(san: string): string {
+  const glyph = FIGURINE[san[0]];
+  return glyph ? glyph + san.slice(1) : san;
+}
+
+/** Maps our 0-1 difficulty "strength" to a familiar chess-rating-looking
+ * number, purely cosmetic — there's no real rating system underneath yet. */
+function strengthToRating(strength: number): number {
+  return Math.round(400 + strength * 2000);
+}
+
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 type GameResult = "user_win" | "user_loss" | "draw" | null;
 
 export default function ChessGame() {
@@ -205,6 +228,19 @@ export default function ChessGame() {
     return styles;
   }, [selectedSquare, legalTargets, game]);
 
+  const rating = useMemo(() => strengthToRating(profile?.strength ?? 0.3), [profile]);
+
+  // Eval bar fill, from White's perspective regardless of whose turn it
+  // is — hint.eval_cp is from the side-to-move's perspective, and hint is
+  // always cleared on the next move, so game.turn() here still matches
+  // the position the hint was fetched for.
+  const evalPercent = useMemo(() => {
+    if (hint?.eval_cp == null) return 50;
+    const whiteCp = game.turn() === "w" ? hint.eval_cp : -hint.eval_cp;
+    const clamped = Math.max(-1000, Math.min(1000, whiteCp));
+    return 50 + (clamped / 1000) * 50;
+  }, [hint, game]);
+
   const movePairs = useMemo(() => {
     const pairs: [string, string | undefined][] = [];
     for (let i = 0; i < history.length; i += 2) {
@@ -234,55 +270,69 @@ export default function ChessGame() {
       <div className="game-layout">
         <div className="board-column">
           <div className="player-bar">
-            <span className="player-name">
-              <span className="player-glyph">♞</span> ChessTempo Bot
+            <span className="avatar avatar-bot">♞</span>
+            <span className="player-info">
+              <span className="player-name">
+                ChessTempo Bot <span className="rating">({rating})</span>
+              </span>
+              <span className="captured-row">
+                {captured.byBot.map((p, i) => (
+                  <span key={i}>{PIECE_GLYPH[p]}</span>
+                ))}
+                {materialDiff < 0 && <span className="material-diff">+{-materialDiff}</span>}
+              </span>
             </span>
-            <span className="captured-row">
-              {captured.byBot.map((p, i) => (
-                <span key={i}>{PIECE_GLYPH[p]}</span>
-              ))}
-              {materialDiff < 0 && <span className="material-diff">+{-materialDiff}</span>}
-            </span>
+            <span className="clock-pill">∞</span>
           </div>
 
-          <div className="board-wrap">
-            <Chessboard
-              position={fen}
-              onPieceDrop={onDrop}
-              onSquareClick={onSquareClick}
-              customSquareStyles={squareStyles}
-              arePiecesDraggable={!thinking && !gameOver}
-              customBoardStyle={{ borderRadius: 0 }}
-              customDarkSquareStyle={{ backgroundColor: "#8b6b4a" }}
-              customLightSquareStyle={{ backgroundColor: "#eddcc0" }}
-            />
-            {gameOver && (
-              <div className="game-over-overlay">
-                <div className="game-over-card">
-                  <h2>
-                    {gameOver.result === "user_win" && "You won! 🎉"}
-                    {gameOver.result === "user_loss" && "Bot wins"}
-                    {gameOver.result === "draw" && "Draw"}
-                  </h2>
-                  <p>{gameOver.reason}</p>
-                  <button className="btn" onClick={newGame}>
-                    New game
-                  </button>
+          <div className="board-with-eval">
+            <div className="eval-bar" title={hint?.eval_cp != null ? `Eval: ${(hint.eval_cp / 100).toFixed(2)}` : "Request a hint to see the eval"}>
+              <div className="eval-bar-fill" style={{ height: `${evalPercent}%` }} />
+            </div>
+
+            <div className="board-wrap">
+              <Chessboard
+                position={fen}
+                onPieceDrop={onDrop}
+                onSquareClick={onSquareClick}
+                customSquareStyles={squareStyles}
+                arePiecesDraggable={!thinking && !gameOver}
+                customBoardStyle={{ borderRadius: 0 }}
+                customDarkSquareStyle={{ backgroundColor: "#8b6b4a" }}
+                customLightSquareStyle={{ backgroundColor: "#eddcc0" }}
+              />
+              {gameOver && (
+                <div className="game-over-overlay">
+                  <div className="game-over-card">
+                    <h2>
+                      {gameOver.result === "user_win" && "You won! 🎉"}
+                      {gameOver.result === "user_loss" && "Bot wins"}
+                      {gameOver.result === "draw" && "Draw"}
+                    </h2>
+                    <p>{gameOver.reason}</p>
+                    <button className="btn" onClick={newGame}>
+                      New game
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="player-bar">
-            <span className="player-name">
-              <span className="player-glyph">♟</span> {profile?.full_name?.split(" ")[0] ?? "You"}
+            <span className="avatar avatar-user">{initials(profile?.full_name || "You")}</span>
+            <span className="player-info">
+              <span className="player-name">
+                {profile?.full_name?.split(" ")[0] ?? "You"} <span className="rating">({rating})</span>
+              </span>
+              <span className="captured-row">
+                {captured.byUser.map((p, i) => (
+                  <span key={i}>{PIECE_GLYPH[p]}</span>
+                ))}
+                {materialDiff > 0 && <span className="material-diff">+{materialDiff}</span>}
+              </span>
             </span>
-            <span className="captured-row">
-              {captured.byUser.map((p, i) => (
-                <span key={i}>{PIECE_GLYPH[p]}</span>
-              ))}
-              {materialDiff > 0 && <span className="material-diff">+{materialDiff}</span>}
-            </span>
+            <span className="clock-pill">∞</span>
           </div>
         </div>
 
@@ -299,20 +349,19 @@ export default function ChessGame() {
               <span className="badge">
                 {DIFFICULTY_LABELS[profile.starting_difficulty] ?? profile.starting_difficulty}
               </span>
-              <span className="badge">strength {profile.strength.toFixed(2)}</span>
               <span className="badge">{profile.games_played} games played</span>
             </div>
           )}
 
           <div className="action-row">
             <button className="btn btn-secondary" onClick={requestHint} disabled={thinking || hintLoading || !!gameOver}>
-              {hintLoading ? "Thinking..." : "Get a hint"}
+              {hintLoading ? "Thinking..." : "💡 Hint"}
             </button>
             <button className="btn btn-secondary" onClick={resign} disabled={thinking || !!gameOver || history.length === 0}>
-              Resign
+              🏳 Resign
             </button>
             <button className="btn btn-secondary" onClick={newGame}>
-              New game
+              ↻ New game
             </button>
           </div>
 
@@ -332,8 +381,8 @@ export default function ChessGame() {
             {movePairs.map(([white, black], i) => (
               <div className="move-row" key={i}>
                 <span className="move-num">{i + 1}.</span>
-                <span className="move-san">{white}</span>
-                <span className="move-san">{black ?? ""}</span>
+                <span className="move-san">{toFigurine(white)}</span>
+                <span className="move-san">{black ? toFigurine(black) : ""}</span>
               </div>
             ))}
           </div>
