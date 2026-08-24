@@ -1,0 +1,9 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+supabase>=2.4
+python-chess>=1.999
+torch>=2.2
+numpy>=1.26
+python-jose[cryptography]>=3.3
+python-dotenv>=1.0

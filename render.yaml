@@ -1,0 +1,21 @@
+# Render "Blueprint" — lets you deploy by pointing Render at this repo
+# instead of clicking through every setting manually.
+# Render dashboard -> New -> Blueprint -> select this repo.
+services:
+  - type: web
+    name: chesstempo-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+      - key: MODEL_CHECKPOINT_PATH
+        value: checkpoints/tempo_best.pt

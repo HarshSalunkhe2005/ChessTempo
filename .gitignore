@@ -15,3 +15,14 @@ checkpoints/
 .DS_Store
 .idea/
 .vscode/
+
+# frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/next-env.d.ts
+frontend/public/sw.js
+frontend/public/workbox-*.js
+
+# backend
+backend/.env

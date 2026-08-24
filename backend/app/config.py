@@ -1,0 +1,33 @@
+"""Environment configuration.
+
+All secrets come from environment variables — never hardcoded, never
+committed. Locally, put them in backend/.env (gitignored); on Render,
+set them in the service's Environment tab.
+"""
+from __future__ import annotations
+
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+class Settings:
+    supabase_url: str = os.environ.get("SUPABASE_URL", "")
+    # The service_role key — full DB access, bypasses Row Level Security.
+    # Required because the backend acts on behalf of any user (verifying
+    # their JWT itself) rather than going through Supabase's per-user auth
+    # context. NEVER expose this key to the frontend.
+    supabase_service_role_key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+    # Used to verify the JWT Supabase issues to a logged-in frontend user.
+    supabase_jwt_secret: str = os.environ.get("SUPABASE_JWT_SECRET", "")
+
+    stockfish_path: str = os.environ.get("STOCKFISH_PATH", "stockfish")
+    model_checkpoint_path: str = os.environ.get("MODEL_CHECKPOINT_PATH", "checkpoints/tempo_best.pt")
+
+    cors_allow_origins: list[str] = os.environ.get("CORS_ALLOW_ORIGINS", "http://localhost:3000").split(",")
+
+
+settings = Settings()
