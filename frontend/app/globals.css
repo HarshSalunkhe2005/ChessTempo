@@ -240,6 +240,25 @@ form .field:nth-of-type(3) {
 
 .play-shell {
   min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(217, 164, 65, 0.05), transparent 40%),
+    radial-gradient(circle at 90% 30%, rgba(217, 164, 65, 0.04), transparent 35%);
+}
+
+.panel-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.panel-card .status-line {
+  margin-top: 0;
+}
+
+.panel-card .action-row {
+  margin-bottom: 0;
 }
 
 .game-layout {
@@ -327,32 +346,54 @@ form .field:nth-of-type(3) {
 
 .player-name {
   font-weight: 600;
+  font-size: 15px;
 }
 
+/* Rating sits right against the name with tight spacing, dimmed — the
+   convention lichess uses (ui/round/css/_user.scss: .ruser rating),
+   rather than floating it as a separate badge. */
 .rating {
   font-weight: 400;
   color: var(--text-dim);
   font-size: 13px;
+  letter-spacing: -0.02em;
+  margin-inline-start: 0.35em;
 }
 
+/* Oversized digital-clock treatment (lichess ui/lib/css/game/_clock.scss
+   uses 2.8-3.6em); ours is static since there's no time control yet, but
+   the active side's clock still tints so the turn is unmistakable at a
+   glance, matching their .rclock.running behavior. */
 .clock-pill {
   font-family: ui-monospace, SFMono-Regular, monospace;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 15px;
+  padding: 6px 16px;
+  font-size: 24px;
+  font-weight: 600;
   color: var(--text-dim);
   flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.clock-active {
+  background: color-mix(in oklab, var(--accent) 22%, var(--bg-elevated));
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 .captured-row {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   color: var(--text-dim);
-  font-size: 16px;
-  min-height: 20px;
+  font-size: 18px;
+  min-height: 22px;
+}
+
+.captured-row span:not(.material-diff) {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
 }
 
 .material-diff {
@@ -410,9 +451,10 @@ form .field:nth-of-type(3) {
 }
 
 .move-list {
-  margin-top: 20px;
+  margin-top: 16px;
   max-height: 260px;
   overflow-y: auto;
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 4px 12px;

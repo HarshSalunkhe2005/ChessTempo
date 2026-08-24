@@ -229,6 +229,7 @@ export default function ChessGame() {
   }, [selectedSquare, legalTargets, game]);
 
   const rating = useMemo(() => strengthToRating(profile?.strength ?? 0.3), [profile]);
+  const whiteToMove = fen.split(" ")[1] === "w";
 
   // Eval bar fill, from White's perspective regardless of whose turn it
   // is — hint.eval_cp is from the side-to-move's perspective, and hint is
@@ -273,16 +274,18 @@ export default function ChessGame() {
             <span className="avatar avatar-bot">♞</span>
             <span className="player-info">
               <span className="player-name">
-                ChessTempo Bot <span className="rating">({rating})</span>
+                ChessTempo Bot<span className="rating">({rating})</span>
               </span>
               <span className="captured-row">
                 {captured.byBot.map((p, i) => (
-                  <span key={i}>{PIECE_GLYPH[p]}</span>
+                  <span key={i} style={{ marginInlineStart: i === 0 ? 0 : -10 }}>
+                    {PIECE_GLYPH[p]}
+                  </span>
                 ))}
                 {materialDiff < 0 && <span className="material-diff">+{-materialDiff}</span>}
               </span>
             </span>
-            <span className="clock-pill">∞</span>
+            <span className={`clock-pill${!whiteToMove && !gameOver ? " clock-active" : ""}`}>∞</span>
           </div>
 
           <div className="board-with-eval">
@@ -298,8 +301,11 @@ export default function ChessGame() {
                 customSquareStyles={squareStyles}
                 arePiecesDraggable={!thinking && !gameOver}
                 customBoardStyle={{ borderRadius: 0 }}
-                customDarkSquareStyle={{ backgroundColor: "#8b6b4a" }}
-                customLightSquareStyle={{ backgroundColor: "#eddcc0" }}
+                // The classic brown board theme shared by lichess and
+                // chess.com — #f0d9b5 / #946f51 is the industry-standard
+                // pairing, not an approximation.
+                customDarkSquareStyle={{ backgroundColor: "#946f51" }}
+                customLightSquareStyle={{ backgroundColor: "#f0d9b5" }}
               />
               {gameOver && (
                 <div className="game-over-overlay">
@@ -323,46 +329,51 @@ export default function ChessGame() {
             <span className="avatar avatar-user">{initials(profile?.full_name || "You")}</span>
             <span className="player-info">
               <span className="player-name">
-                {profile?.full_name?.split(" ")[0] ?? "You"} <span className="rating">({rating})</span>
+                {profile?.full_name?.split(" ")[0] ?? "You"}
+                <span className="rating">({rating})</span>
               </span>
               <span className="captured-row">
                 {captured.byUser.map((p, i) => (
-                  <span key={i}>{PIECE_GLYPH[p]}</span>
+                  <span key={i} style={{ marginInlineStart: i === 0 ? 0 : -10 }}>
+                    {PIECE_GLYPH[p]}
+                  </span>
                 ))}
                 {materialDiff > 0 && <span className="material-diff">+{materialDiff}</span>}
               </span>
             </span>
-            <span className="clock-pill">∞</span>
+            <span className={`clock-pill${whiteToMove && !gameOver ? " clock-active" : ""}`}>∞</span>
           </div>
         </div>
 
         <div className="side-panel">
-          <p className="status-line">
-            {thinking && <span className="spinner" />}
-            {status}
-          </p>
+          <div className="panel-card">
+            <p className="status-line">
+              {thinking && <span className="spinner" />}
+              {status}
+            </p>
 
-          {profileError && <p className="error-text">Couldn't load profile: {profileError}</p>}
+            {profileError && <p className="error-text">Couldn't load profile: {profileError}</p>}
 
-          {profile && (
-            <div className="stat-row">
-              <span className="badge">
-                {DIFFICULTY_LABELS[profile.starting_difficulty] ?? profile.starting_difficulty}
-              </span>
-              <span className="badge">{profile.games_played} games played</span>
+            {profile && (
+              <div className="stat-row">
+                <span className="badge">
+                  {DIFFICULTY_LABELS[profile.starting_difficulty] ?? profile.starting_difficulty}
+                </span>
+                <span className="badge">{profile.games_played} games played</span>
+              </div>
+            )}
+
+            <div className="action-row">
+              <button className="btn btn-secondary" onClick={requestHint} disabled={thinking || hintLoading || !!gameOver}>
+                {hintLoading ? "Thinking..." : "💡 Hint"}
+              </button>
+              <button className="btn btn-secondary" onClick={resign} disabled={thinking || !!gameOver || history.length === 0}>
+                🏳 Resign
+              </button>
+              <button className="btn btn-secondary" onClick={newGame}>
+                ↻ New game
+              </button>
             </div>
-          )}
-
-          <div className="action-row">
-            <button className="btn btn-secondary" onClick={requestHint} disabled={thinking || hintLoading || !!gameOver}>
-              {hintLoading ? "Thinking..." : "💡 Hint"}
-            </button>
-            <button className="btn btn-secondary" onClick={resign} disabled={thinking || !!gameOver || history.length === 0}>
-              🏳 Resign
-            </button>
-            <button className="btn btn-secondary" onClick={newGame}>
-              ↻ New game
-            </button>
           </div>
 
           {hint && (
