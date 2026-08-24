@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { HeroGlyphs } from "@/components/ChessArt";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -62,6 +63,7 @@ export default function SignupPage() {
 
   return (
     <main className="page-center">
+      <HeroGlyphs />
       <div className="card">
         <div className="brand">
           <span className="brand-mark">♞</span>
