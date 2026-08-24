@@ -238,21 +238,147 @@ form .field:nth-of-type(3) {
   margin-top: 8px;
 }
 
+.play-shell {
+  min-height: 100vh;
+}
+
 .game-layout {
   display: flex;
   gap: 32px;
-  padding: 32px;
+  padding: 8px 32px 32px;
   flex-wrap: wrap;
-  max-width: 960px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
-.board-wrap {
+.board-column {
   width: 440px;
   max-width: 100%;
+}
+
+.board-wrap {
+  position: relative;
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
+}
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+  font-size: 14px;
+}
+
+.player-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.player-glyph {
+  color: var(--accent);
+  font-size: 18px;
+}
+
+.captured-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-dim);
+  font-size: 16px;
+  min-height: 20px;
+}
+
+.material-diff {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--success);
+  margin-left: 4px;
+}
+
+.game-over-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 13, 18, 0.72);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: field-in 0.25s ease;
+}
+
+.game-over-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  text-align: center;
+  animation: card-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.game-over-card h2 {
+  margin: 0 0 6px;
+}
+
+.game-over-card p {
+  color: var(--text-dim);
+  margin: 0 0 20px;
+}
+
+.game-over-card .btn {
+  width: auto;
+  padding: 10px 24px;
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.action-row .btn-secondary {
+  flex: 1;
+  min-width: 100px;
+  text-align: center;
+}
+
+.move-list {
+  margin-top: 20px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 12px;
+}
+
+.move-list h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin: 8px 0;
+}
+
+.move-row {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.move-num {
+  color: var(--text-dim);
+  width: 24px;
+}
+
+.move-san {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
 .side-panel {

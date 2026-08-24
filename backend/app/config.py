@@ -28,6 +28,14 @@ class Settings:
     model_checkpoint_path: str = os.environ.get("MODEL_CHECKPOINT_PATH", "checkpoints/tempo_best.pt")
 
     cors_allow_origins: list[str] = os.environ.get("CORS_ALLOW_ORIGINS", "http://localhost:3000").split(",")
+    # Vercel preview deployments get a fresh random subdomain per branch/PR
+    # (e.g. chesstempo-git-feat-x-yourname.vercel.app) — an exact-match
+    # allowlist breaks on every one of those. This regex covers your
+    # production domain plus any Vercel preview URL for the project, so
+    # CORS doesn't need a manual fix on every deploy.
+    cors_allow_origin_regex: str = os.environ.get(
+        "CORS_ALLOW_ORIGIN_REGEX", r"https://.*\.vercel\.app"
+    )
 
 
 settings = Settings()
