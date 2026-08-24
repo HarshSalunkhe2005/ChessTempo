@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { api, HintResponse, ProfileResponse } from "@/lib/api";
+import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 const DIFFICULTY_LABELS: Record<string, string> = {
   beginner: "Beginner",
@@ -13,6 +15,7 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 };
 
 export default function ChessGame() {
+  const router = useRouter();
   // useMemo so we get one persistent Chess instance across renders, not a
   // fresh game every re-render.
   const game = useMemo(() => new Chess(), []);
@@ -91,7 +94,18 @@ export default function ChessGame() {
       </div>
 
       <div className="side-panel">
-        <h1>ChessTempo</h1>
+        <div className="side-panel-header">
+          <h1>{profile?.full_name ? `Hey, ${profile.full_name.split(" ")[0]}` : "ChessTempo"}</h1>
+          <button
+            className="btn-link"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push("/");
+            }}
+          >
+            Log out
+          </button>
+        </div>
         <p className="status-line">{thinking && <span className="spinner" />}{status}</p>
 
         {profile && (

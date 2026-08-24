@@ -29,3 +29,4 @@ class ProfileResponse(BaseModel):
     starting_difficulty: str
     strength: float
     games_played: int
+    full_name: str | None = None

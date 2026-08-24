@@ -8,6 +8,7 @@
 -- One row per user: their difficulty/strength state (tempo.mentor.difficulty).
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
+  full_name text,                                -- captured at signup (auth.users.raw_user_meta_data)
   starting_difficulty text not null default 'casual'
     check (starting_difficulty in ('beginner', 'casual', 'club', 'strong')),
   strength real not null default 0.30,          -- current DifficultyController.strength
@@ -62,7 +63,7 @@ create policy "personalization_state: read own" on public.personalization_state
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id) values (new.id);
+  insert into public.profiles (id, full_name) values (new.id, new.raw_user_meta_data->>'full_name');
   insert into public.personalization_state (user_id) values (new.id);
   return new;
 end;

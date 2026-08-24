@@ -50,6 +50,7 @@ export interface ProfileResponse {
   starting_difficulty: string;
   strength: number;
   games_played: number;
+  full_name: string | null;
 }
 
 export const api = {

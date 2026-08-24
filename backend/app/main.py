@@ -63,6 +63,7 @@ def get_profile(user_id: str = Depends(get_current_user_id)):
         starting_difficulty=profile["starting_difficulty"],
         strength=profile["strength"],
         games_played=profile["games_played"],
+        full_name=profile.get("full_name"),
     )
 
 
