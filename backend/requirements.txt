@@ -7,3 +7,4 @@ torch>=2.2
 numpy>=1.26
 python-jose[cryptography]>=3.3
 python-dotenv>=1.0
+requests>=2.31
