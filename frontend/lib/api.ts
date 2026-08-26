@@ -53,8 +53,43 @@ export interface ProfileResponse {
   full_name: string | null;
 }
 
+export interface GameSummary {
+  id: string;
+  result: "user_win" | "user_loss" | "draw";
+  strength_at_start: number;
+  strength_at_end: number;
+  created_at: string;
+}
+
+export interface ProfileStats {
+  total_games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  win_rate: number | null;
+  current_strength: number;
+}
+
+export interface MoveReviewItem {
+  ply: number;
+  san: string;
+  color: "white" | "black";
+  classification: string;
+  eval_cp: number | null;
+}
+
+export interface ReviewResponse {
+  moves: MoveReviewItem[];
+  accuracy_white: number | null;
+  accuracy_black: number | null;
+}
+
 export const api = {
   getProfile: (): Promise<ProfileResponse> => authedFetch("/profile"),
+
+  getGames: (): Promise<GameSummary[]> => authedFetch("/games"),
+
+  getProfileStats: (): Promise<ProfileStats> => authedFetch("/profile/stats"),
 
   requestBotMove: (fen: string): Promise<MoveResponse> =>
     authedFetch("/game/move", { method: "POST", body: JSON.stringify({ fen }) }),
@@ -64,4 +99,10 @@ export const api = {
 
   finishGame: (pgn: string, result: "user_win" | "user_loss" | "draw") =>
     authedFetch("/game/finish", { method: "POST", body: JSON.stringify({ pgn, result }) }),
+
+  // Move-quality review is slow (many Stockfish calls per game) — expect
+  // this to take a while on Render's free tier; the UI should show a
+  // loading state, not assume this resolves quickly.
+  reviewGame: (pgn: string): Promise<ReviewResponse> =>
+    authedFetch("/game/review", { method: "POST", body: JSON.stringify({ pgn }) }),
 };

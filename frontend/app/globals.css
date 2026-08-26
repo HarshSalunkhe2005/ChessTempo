@@ -550,6 +550,15 @@ form .field:nth-of-type(3) {
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
+.move-tag {
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 700;
+  margin-inline-start: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .side-panel {
   flex: 1;
   min-width: 260px;
@@ -854,6 +863,32 @@ form .field:nth-of-type(3) {
   font-size: 14px;
   color: var(--text-dim);
   line-height: 1.5;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.stat-tile {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-tile-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.stat-tile-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
 }
 
 .footer {

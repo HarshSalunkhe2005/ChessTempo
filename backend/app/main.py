@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from tempo.mentor.difficulty import DifficultyController
 from tempo.mentor.motifs import detect_motifs
+from tempo.mentor.review import review_game
 from tempo.game.play import TempoPlayer
 
 from app.auth import get_current_user_id
@@ -24,10 +25,15 @@ from app.db import get_supabase
 from app.model_singleton import get_model, get_oracle
 from app.schemas import (
     FinishGameRequest,
+    GameSummary,
     HintResponse,
     MoveRequest,
     MoveResponse,
+    MoveReviewOut,
     ProfileResponse,
+    ProfileStats,
+    ReviewRequest,
+    ReviewResponse,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -155,3 +161,63 @@ def finish_game(req: FinishGameRequest, user_id: str = Depends(get_current_user_
     ).eq("id", user_id).execute()
 
     return {"new_strength": controller.strength}
+
+
+@app.get("/games", response_model=list[GameSummary])
+def list_games(user_id: str = Depends(get_current_user_id), limit: int = 20):
+    """Recent game history for the profile page."""
+    sb = get_supabase()
+    resp = (
+        sb.table("games")
+        .select("id, result, strength_at_start, strength_at_end, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return [GameSummary(**row) for row in resp.data]
+
+
+@app.get("/profile/stats", response_model=ProfileStats)
+def get_profile_stats(user_id: str = Depends(get_current_user_id)):
+    """Aggregate win/loss/draw record for the profile page."""
+    sb = get_supabase()
+    profile = _get_profile(user_id)
+    resp = sb.table("games").select("result").eq("user_id", user_id).execute()
+
+    wins = sum(1 for g in resp.data if g["result"] == "user_win")
+    losses = sum(1 for g in resp.data if g["result"] == "user_loss")
+    draws = sum(1 for g in resp.data if g["result"] == "draw")
+    total = len(resp.data)
+
+    return ProfileStats(
+        total_games=total,
+        wins=wins,
+        losses=losses,
+        draws=draws,
+        win_rate=round(100 * wins / total, 1) if total else None,
+        current_strength=profile["strength"],
+    )
+
+
+@app.post("/game/review", response_model=ReviewResponse)
+def review(req: ReviewRequest, user_id: str = Depends(get_current_user_id)):
+    """Move-by-move quality classification for a finished game (Best,
+    Good, Inaccuracy, Mistake, Blunder, occasionally Brilliant) plus a
+    per-side accuracy percentage — see tempo.mentor.review for the method
+    and its honest limitations (heuristic, not any site's exact formula).
+
+    Slow: one to two Stockfish calls per half-move. Fine for now; a
+    background-job version is the right fix if this becomes a real
+    bottleneck under actual usage.
+    """
+    oracle = get_oracle()
+    if oracle is None:
+        raise HTTPException(status_code=503, detail="Stockfish unavailable — can't review this game right now")
+
+    moves, accuracy = review_game(req.pgn, oracle)
+    return ReviewResponse(
+        moves=[MoveReviewOut(**vars(m)) for m in moves],
+        accuracy_white=accuracy["white"],
+        accuracy_black=accuracy["black"],
+    )

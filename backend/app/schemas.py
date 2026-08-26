@@ -30,3 +30,38 @@ class ProfileResponse(BaseModel):
     strength: float
     games_played: int
     full_name: str | None = None
+
+
+class GameSummary(BaseModel):
+    id: str
+    result: str
+    strength_at_start: float
+    strength_at_end: float
+    created_at: str
+
+
+class ProfileStats(BaseModel):
+    total_games: int
+    wins: int
+    losses: int
+    draws: int
+    win_rate: float | None = None  # percent, None if no games yet
+    current_strength: float
+
+
+class ReviewRequest(BaseModel):
+    pgn: str
+
+
+class MoveReviewOut(BaseModel):
+    ply: int
+    san: str
+    color: str
+    classification: str
+    eval_cp: int | None = None
+
+
+class ReviewResponse(BaseModel):
+    moves: list[MoveReviewOut]
+    accuracy_white: float | None = None
+    accuracy_black: float | None = None

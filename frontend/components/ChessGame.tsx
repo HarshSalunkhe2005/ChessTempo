@@ -4,15 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Chess, Square } from "chess.js";
 import { Chessboard } from "react-chessboard";
-import { api, HintResponse, ProfileResponse } from "@/lib/api";
+import { api, HintResponse, ProfileResponse, ReviewResponse } from "@/lib/api";
 import { supabase } from "@/lib/supabaseClient";
-
-const DIFFICULTY_LABELS: Record<string, string> = {
-  beginner: "Beginner",
-  casual: "Casual",
-  club: "Club",
-  strong: "Strong",
-};
+import { DIFFICULTY_LABELS, toFigurine, strengthToRating, initials, CLASSIFICATION_COLOR } from "@/lib/chessDisplay";
 
 const PIECE_GLYPH: Record<string, string> = {
   p: "♟",
@@ -23,29 +17,6 @@ const PIECE_GLYPH: Record<string, string> = {
 };
 
 const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
-
-const FIGURINE: Record<string, string> = { N: "♞", B: "♝", R: "♜", Q: "♛", K: "♚" };
-
-/** SAN like "Nf3" -> "♞f3" — figurine notation, as used in most move lists. */
-function toFigurine(san: string): string {
-  const glyph = FIGURINE[san[0]];
-  return glyph ? glyph + san.slice(1) : san;
-}
-
-/** Maps our 0-1 difficulty "strength" to a familiar chess-rating-looking
- * number, purely cosmetic — there's no real rating system underneath yet. */
-function strengthToRating(strength: number): number {
-  return Math.round(400 + strength * 2000);
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 type GameResult = "user_win" | "user_loss" | "draw" | null;
 
@@ -126,6 +97,9 @@ export default function ChessGame() {
     byBot: [],
   });
   const [gameOver, setGameOver] = useState<{ result: GameResult; reason: string } | null>(null);
+  const [review, setReview] = useState<ReviewResponse | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const loadProfile = useCallback(() => {
     setProfileError(null);
@@ -255,6 +229,16 @@ export default function ChessGame() {
     endGameIfOver("user_loss", "Resigned");
   }, [game, gameOver, endGameIfOver]);
 
+  const requestReview = useCallback(() => {
+    setReviewError(null);
+    setReviewLoading(true);
+    api
+      .reviewGame(game.pgn())
+      .then(setReview)
+      .catch((e) => setReviewError(e.message))
+      .finally(() => setReviewLoading(false));
+  }, [game]);
+
   const newGame = useCallback(() => {
     setGameKey((k) => k + 1);
     setFen(new Chess().fen());
@@ -266,6 +250,8 @@ export default function ChessGame() {
     setSelectedSquare(null);
     setLegalTargets([]);
     setLastMove(null);
+    setReview(null);
+    setReviewError(null);
   }, []);
 
   const squareStyles = useMemo(() => {
@@ -311,6 +297,12 @@ export default function ChessGame() {
     return pairs;
   }, [history]);
 
+  const classificationByPly = useMemo(() => {
+    const map = new Map<number, string>();
+    review?.moves.forEach((m) => map.set(m.ply, m.classification));
+    return map;
+  }, [review]);
+
   return (
     <div className="play-shell">
       <nav className="nav">
@@ -318,15 +310,20 @@ export default function ChessGame() {
           <span className="brand-mark">♞</span>
           <span className="brand-name">ChessTempo</span>
         </div>
-        <button
-          className="btn-link"
-          onClick={async () => {
-            await supabase.auth.signOut();
-            router.push("/");
-          }}
-        >
-          Log out
-        </button>
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <button className="btn-link" onClick={() => router.push("/profile")}>
+            Profile
+          </button>
+          <button
+            className="btn-link"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push("/");
+            }}
+          >
+            Log out
+          </button>
+        </div>
       </nav>
 
       <div className="game-layout">
@@ -377,9 +374,22 @@ export default function ChessGame() {
                       {gameOver.result === "draw" && "Draw"}
                     </h2>
                     <p>{gameOver.reason}</p>
-                    <button className="btn" onClick={newGame}>
-                      New game
-                    </button>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                      {!review && (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ width: "auto" }}
+                          onClick={requestReview}
+                          disabled={reviewLoading}
+                        >
+                          {reviewLoading ? "Reviewing..." : "Review game"}
+                        </button>
+                      )}
+                      <button className="btn" style={{ width: "auto", padding: "10px 24px" }} onClick={newGame}>
+                        New game
+                      </button>
+                    </div>
+                    {reviewError && <p className="error-text">{reviewError}</p>}
                   </div>
                 </div>
               )}
@@ -456,17 +466,57 @@ export default function ChessGame() {
             </div>
           )}
 
+          {review && (
+            <div className="panel-card" style={{ marginBottom: 0 }}>
+              <div className="status-eyebrow">Accuracy</div>
+              <div style={{ display: "flex", gap: 20 }}>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-display)" }}>
+                    {review.accuracy_white ?? "—"}
+                    {review.accuracy_white != null && "%"}
+                  </div>
+                  <div className="hint-eval">White</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-display)" }}>
+                    {review.accuracy_black ?? "—"}
+                    {review.accuracy_black != null && "%"}
+                  </div>
+                  <div className="hint-eval">Black</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="move-list">
             <h3>Moves</h3>
             <div className="move-list-body">
               {movePairs.length === 0 && <p className="hint-eval">No moves yet.</p>}
-              {movePairs.map(([white, black], i) => (
-                <div className="move-row" key={i}>
-                  <span className="move-num">{i + 1}.</span>
-                  <span className="move-san">{toFigurine(white)}</span>
-                  <span className="move-san">{black ? toFigurine(black) : ""}</span>
-                </div>
-              ))}
+              {movePairs.map(([white, black], i) => {
+                const whiteClass = classificationByPly.get(i * 2 + 1);
+                const blackClass = black ? classificationByPly.get(i * 2 + 2) : undefined;
+                return (
+                  <div className="move-row" key={i}>
+                    <span className="move-num">{i + 1}.</span>
+                    <span className="move-san">
+                      {toFigurine(white)}
+                      {whiteClass && (
+                        <span className="move-tag" style={{ color: CLASSIFICATION_COLOR[whiteClass] }} title={whiteClass}>
+                          {whiteClass}
+                        </span>
+                      )}
+                    </span>
+                    <span className="move-san">
+                      {black ? toFigurine(black) : ""}
+                      {blackClass && (
+                        <span className="move-tag" style={{ color: CLASSIFICATION_COLOR[blackClass] }} title={blackClass}>
+                          {blackClass}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

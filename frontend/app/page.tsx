@@ -46,9 +46,14 @@ export default function LandingPage() {
         </div>
         <div className="nav-links">
           {loggedIn ? (
-            <Link href="/play" className="btn btn-small">
-              Play
-            </Link>
+            <>
+              <Link href="/profile" className="btn-secondary">
+                Profile
+              </Link>
+              <Link href="/play" className="btn btn-small">
+                Play
+              </Link>
+            </>
           ) : (
             <>
               <Link href="/login" className="btn-secondary">
