@@ -49,6 +49,59 @@ function initials(name: string): string {
 
 type GameResult = "user_win" | "user_loss" | "draw" | null;
 
+// Stroke-based icons, not emoji — keeps the action row consistent with the
+// rest of the brand rather than relying on OS emoji rendering.
+function IconHint() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.55 1 1.3 1 2.1V16h6v-.4c0-.8.4-1.55 1-2.1A6 6 0 0 0 12 3z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconFlag() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M6 3v18M6 4h11l-2.5 3.5L17 11H6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconRefresh() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 12a8 8 0 1 1 2.6 5.9M4 12V7m0 5h5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconInfo() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, opacity: 0.7 }}>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 8v5M12 16h.01" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function ChessGame() {
   const router = useRouter();
   // useMemo so we get one persistent Chess instance across renders, not a
@@ -66,6 +119,7 @@ export default function ChessGame() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [legalTargets, setLegalTargets] = useState<Square[]>([]);
+  const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [captured, setCaptured] = useState<{ byUser: string[]; byBot: string[] }>({
     byUser: [],
@@ -127,6 +181,7 @@ export default function ChessGame() {
       setHint(null);
       setSelectedSquare(null);
       setLegalTargets([]);
+      setLastMove({ from: move.from as Square, to: move.to as Square });
       return true;
     },
     [game]
@@ -210,10 +265,16 @@ export default function ChessGame() {
     setStatus("Your move.");
     setSelectedSquare(null);
     setLegalTargets([]);
+    setLastMove(null);
   }, []);
 
   const squareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
+    if (lastMove) {
+      const lastMoveStyle = { background: "rgba(217, 164, 65, 0.28)" };
+      styles[lastMove.from] = lastMoveStyle;
+      styles[lastMove.to] = lastMoveStyle;
+    }
     if (selectedSquare) {
       styles[selectedSquare] = { background: "rgba(217, 164, 65, 0.35)" };
     }
@@ -226,7 +287,7 @@ export default function ChessGame() {
       };
     }
     return styles;
-  }, [selectedSquare, legalTargets, game]);
+  }, [selectedSquare, legalTargets, lastMove, game]);
 
   const rating = useMemo(() => strengthToRating(profile?.strength ?? 0.3), [profile]);
   const whiteToMove = fen.split(" ")[1] === "w";
@@ -347,6 +408,7 @@ export default function ChessGame() {
 
         <div className="side-panel">
           <div className="panel-card">
+            <div className="status-eyebrow">Game status</div>
             <p className="status-line">
               {thinking && <span className="spinner" />}
               {status}
@@ -356,7 +418,7 @@ export default function ChessGame() {
 
             {profile && (
               <div className="stat-row">
-                <span className="badge">
+                <span className="badge badge-accent">
                   {DIFFICULTY_LABELS[profile.starting_difficulty] ?? profile.starting_difficulty}
                 </span>
                 <span className="badge">{profile.games_played} games played</span>
@@ -364,19 +426,22 @@ export default function ChessGame() {
             )}
 
             <div className="action-row">
-              <button className="btn btn-secondary" onClick={requestHint} disabled={thinking || hintLoading || !!gameOver}>
-                {hintLoading ? "Thinking..." : "💡 Hint"}
+              <button className="btn btn-hint" onClick={requestHint} disabled={thinking || hintLoading || !!gameOver}>
+                <IconHint />
+                {hintLoading ? "Thinking..." : "Hint"}
               </button>
               <button className="btn btn-secondary" onClick={resign} disabled={thinking || !!gameOver || history.length === 0}>
-                🏳 Resign
+                <IconFlag />
+                Resign
               </button>
               <button className="btn btn-secondary" onClick={newGame}>
-                ↻ New game
+                <IconRefresh />
+                New game
               </button>
             </div>
           </div>
 
-          {hint && (
+          {hint ? (
             <div className="hint-panel">
               {hint.eval_cp !== null && <p className="hint-eval">Eval: {(hint.eval_cp / 100).toFixed(2)}</p>}
               {hint.motifs.length === 0 && <p>Nothing jumps out — solid position.</p>}
@@ -384,18 +449,25 @@ export default function ChessGame() {
                 <p key={i}>⚠️ {m.description}</p>
               ))}
             </div>
+          ) : (
+            <div className="tip-panel">
+              <IconInfo />
+              Request a hint any time to see the position eval and any tactics worth noticing.
+            </div>
           )}
 
           <div className="move-list">
             <h3>Moves</h3>
-            {movePairs.length === 0 && <p className="hint-eval">No moves yet.</p>}
-            {movePairs.map(([white, black], i) => (
-              <div className="move-row" key={i}>
-                <span className="move-num">{i + 1}.</span>
-                <span className="move-san">{toFigurine(white)}</span>
-                <span className="move-san">{black ? toFigurine(black) : ""}</span>
-              </div>
-            ))}
+            <div className="move-list-body">
+              {movePairs.length === 0 && <p className="hint-eval">No moves yet.</p>}
+              {movePairs.map(([white, black], i) => (
+                <div className="move-row" key={i}>
+                  <span className="move-num">{i + 1}.</span>
+                  <span className="move-san">{toFigurine(white)}</span>
+                  <span className="move-san">{black ? toFigurine(black) : ""}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
