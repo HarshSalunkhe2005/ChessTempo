@@ -8,3 +8,6 @@ numpy>=1.26
 python-jose[cryptography]>=3.3
 python-dotenv>=1.0
 requests>=2.31
+# Pulled in transitively by app.personalization -> tempo.mentor.personalization
+# -> tempo.model.finetune, which reports fine-tune progress with tqdm.
+tqdm>=4.66
