@@ -20,7 +20,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from tempo.data.shard_dataset import ShardedPositionDataset
+from tempo.data.shard_dataset import ShardedPositionDataset, ShardShuffleSampler
 from tempo.model.net import TempoNet
 
 
@@ -43,7 +43,13 @@ def finetune(
     model.load_state_dict(torch.load(base_checkpoint, map_location=device))
 
     dataset = ShardedPositionDataset(user_shard_dir)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    # Per-user shards accumulate one-per-game (tempo.data.game_log) and can
+    # number in the dozens — a plain shuffle=True thrashes
+    # ShardedPositionDataset's one-shard cache the same way it does for
+    # bulk training (see ShardShuffleSampler's docstring), just with
+    # smaller, faster-to-reload shards. Still worth avoiding.
+    sampler = ShardShuffleSampler(dataset, shard_ids=range(len(dataset.shard_paths)))
+    loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler, num_workers=0)
 
     # Small LR + few epochs: we want the model nudged toward this user's
     # tendencies, not overwritten by a tiny dataset.

@@ -19,3 +19,17 @@ services:
         sync: false
       - key: MODEL_CHECKPOINT_PATH
         value: checkpoints/tempo_best.pt
+      # Optional: a URL (e.g. Supabase Storage) to fetch the checkpoint
+      # from on boot if it's not already at MODEL_CHECKPOINT_PATH — see
+      # the README's "Deploying for free" section.
+      - key: MODEL_CHECKPOINT_URL
+        sync: false
+      # Render's free tier has an ephemeral filesystem — anything written
+      # to disk (personalization shards/checkpoints) is lost on every
+      # restart/redeploy. Fine for demoing the base model; if
+      # personalization needs to survive restarts, point these at a
+      # persistent disk (Render's paid tiers) or object storage instead.
+      - key: PERSONALIZATION_DATA_DIR
+        value: data/users
+      - key: PERSONALIZATION_CHECKPOINT_DIR
+        value: checkpoints/personalized

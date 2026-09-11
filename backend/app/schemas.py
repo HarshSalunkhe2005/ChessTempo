@@ -18,6 +18,7 @@ class MoveResponse(BaseModel):
 class HintResponse(BaseModel):
     motifs: list[dict]
     eval_cp: int | None = None
+    eval_label: str | None = None
 
 
 class FinishGameRequest(BaseModel):

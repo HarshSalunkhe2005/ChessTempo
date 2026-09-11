@@ -4,10 +4,11 @@ whole dataset — keeps this workable on a 12GB-RAM laptop."""
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterator, Sequence
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Sampler
 
 
 class ShardedPositionDataset(Dataset):
@@ -46,3 +47,47 @@ class ShardedPositionDataset(Dataset):
         board = torch.from_numpy(self._cached_boards[offset])
         move = int(self._cached_moves[offset])
         return board, move
+
+    def shard_index_ranges(self) -> list[tuple[int, int]]:
+        """[(start, end), ...] global index ranges for each shard, in the
+        same order as `shard_paths`."""
+        ranges = []
+        prev = 0
+        for c in self._cumulative:
+            ranges.append((prev, int(c)))
+            prev = int(c)
+        return ranges
+
+
+class ShardShuffleSampler(Sampler[int]):
+    """Shuffles *within* each shard and shuffles shard visitation order,
+    but never interleaves shards — each shard gets loaded (and decoded)
+    at most once per epoch instead of on nearly every `__getitem__` call.
+
+    A plain `DataLoader(..., shuffle=True)` draws a fresh random global
+    index for every single sample; with more than a couple of shards, that
+    almost always misses `ShardedPositionDataset`'s one-shard cache, so
+    every sample re-reads and re-decompresses a whole shard file from
+    disk. Concretely: on a 10-shard dataset this turned a should-be-fast
+    training step into ~30 seconds per batch. Restricting shuffling to
+    "shard order + within-shard order" keeps SGD's shuffling benefit
+    without that thrashing.
+    """
+
+    def __init__(self, dataset: ShardedPositionDataset, shard_ids: Sequence[int], generator=None):
+        self.dataset = dataset
+        self.shard_ids = list(shard_ids)
+        self.generator = generator
+
+    def __iter__(self) -> Iterator[int]:
+        ranges = self.dataset.shard_index_ranges()
+        shard_order = torch.randperm(len(self.shard_ids), generator=self.generator).tolist()
+        for pos in shard_order:
+            start, end = ranges[self.shard_ids[pos]]
+            local_order = torch.randperm(end - start, generator=self.generator).tolist()
+            for offset in local_order:
+                yield start + offset
+
+    def __len__(self) -> int:
+        ranges = self.dataset.shard_index_ranges()
+        return sum(ranges[sid][1] - ranges[sid][0] for sid in self.shard_ids)

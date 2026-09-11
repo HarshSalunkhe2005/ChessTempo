@@ -11,9 +11,9 @@ import numpy as np
 
 PIECE_TYPES = [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING]
 
-# 6 piece types x 2 colors = 12 "is this piece here" planes, plus 6 metadata
-# planes (side to move, castling rights x4, en-passant-ish placeholder).
-NUM_PLANES = 12 + 6
+# 6 piece types x 2 colors = 12 "is this piece here" planes, plus 7 metadata
+# planes (side to move, castling rights x4, en-passant target square, check).
+NUM_PLANES = 12 + 7
 BOARD_SIZE = 8
 
 
@@ -42,7 +42,12 @@ def board_to_tensor(board: chess.Board) -> np.ndarray:
     planes[meta_base + 2, :, :] = float(board.has_queenside_castling_rights(board.turn))
     planes[meta_base + 3, :, :] = float(board.has_kingside_castling_rights(not board.turn))
     planes[meta_base + 4, :, :] = float(board.has_queenside_castling_rights(not board.turn))
-    planes[meta_base + 5, :, :] = float(board.is_check())
+    if board.ep_square is not None:
+        row, col = divmod(board.ep_square, 8)
+        if flip:
+            row, col = 7 - row, 7 - col
+        planes[meta_base + 5, row, col] = 1.0
+    planes[meta_base + 6, :, :] = float(board.is_check())
 
     return planes
 
@@ -59,8 +64,16 @@ def _square_to_flipped(square: int, flip: bool) -> int:
 # from/to pair) for the 3 forward-diagonal-ish promotion squares per side.
 # This mirrors AlphaZero's "from-to plus underpromotion flag" trick, kept
 # simple rather than the full 73-plane move encoding.
+#
+# An underpromotion is fully determined by (to_square, capture direction,
+# promotion piece) since the from_square's rank is fixed (7th/2nd) and its
+# file is just to_square's file shifted by the capture direction — but the
+# direction itself still has to be encoded. Without it, e.g. dxe8=N and
+# fxe8=N (two different pawns, same target square, same piece) would
+# collide on the same index.
+NUM_PROMO_DIRECTIONS = 3  # capture-left, straight, capture-right
 NUM_UNDERPROMOTIONS = 3  # knight, bishop, rook
-MOVE_SPACE_SIZE = 64 * 64 + 64 * NUM_UNDERPROMOTIONS
+MOVE_SPACE_SIZE = 64 * 64 + 64 * NUM_PROMO_DIRECTIONS * NUM_UNDERPROMOTIONS
 
 _UNDERPROMO_PIECES = [chess.KNIGHT, chess.BISHOP, chess.ROOK]
 
@@ -74,7 +87,8 @@ def move_to_index(move: chess.Move, board: chess.Board) -> int:
 
     if move.promotion and move.promotion != chess.QUEEN:
         promo_idx = _UNDERPROMO_PIECES.index(move.promotion)
-        return 64 * 64 + to * NUM_UNDERPROMOTIONS + promo_idx
+        direction = chess.square_file(to) - chess.square_file(frm) + 1  # 0, 1, 2
+        return 64 * 64 + (to * NUM_PROMO_DIRECTIONS + direction) * NUM_UNDERPROMOTIONS + promo_idx
 
     return frm * 64 + to
 

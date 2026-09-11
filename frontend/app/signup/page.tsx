@@ -5,12 +5,25 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { HeroGlyphs } from "@/components/ChessArt";
+import { DIFFICULTY_LABELS } from "@/lib/chessDisplay";
+
+// Mirrors DifficultyController.STARTING_DIFFICULTY_MAP — the actual
+// strength values live server-side (supabase/schema.sql's handle_new_user
+// trigger); this is just what the picker shows.
+const DIFFICULTY_HINTS: Record<string, string> = {
+  beginner: "New to chess or still learning the rules",
+  casual: "Play sometimes, know the basics well",
+  club: "Play regularly, know openings and tactics",
+  strong: "Tournament-level or near it",
+};
+const DIFFICULTY_OPTIONS = Object.keys(DIFFICULTY_LABELS);
 
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [difficulty, setDifficulty] = useState("casual");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
@@ -23,7 +36,7 @@ export default function SignupPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name } },
+      options: { data: { full_name: name, starting_difficulty: difficulty } },
     });
 
     setLoading(false);
@@ -98,6 +111,24 @@ export default function SignupPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="field"
           />
+
+          <p className="subtitle" style={{ margin: "4px 0 8px" }}>
+            How would you describe your chess level?
+          </p>
+          <div className="difficulty-picker">
+            {DIFFICULTY_OPTIONS.map((key) => (
+              <button
+                type="button"
+                key={key}
+                className={`difficulty-option${difficulty === key ? " selected" : ""}`}
+                onClick={() => setDifficulty(key)}
+              >
+                <span className="difficulty-option-label">{DIFFICULTY_LABELS[key]}</span>
+                <span className="difficulty-option-hint">{DIFFICULTY_HINTS[key]}</span>
+              </button>
+            ))}
+          </div>
+
           <button type="submit" className="btn" disabled={loading}>
             {loading && <span className="spinner" />}
             {loading ? "Creating account..." : "Sign up"}

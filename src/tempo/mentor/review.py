@@ -14,6 +14,7 @@ import math
 from dataclasses import dataclass
 
 import chess
+import chess.engine
 import chess.pgn
 import io
 
@@ -125,6 +126,39 @@ def review_game(pgn: str, oracle: StockfishOracle, depth: int | None = None) -> 
         "black": _accuracy_from_losses(cp_losses["black"]),
     }
     return reviews, accuracy
+
+
+def estimate_game_closeness(
+    pgn: str, user_color: chess.Color, oracle: StockfishOracle, threshold_cp: int = 150
+) -> bool:
+    """Rough proxy for "was this game close," fed into
+    `tempo.mentor.difficulty.DifficultyController.update_after_game` so a
+    narrow finish doesn't swing strength as hard as a rout.
+
+    Evaluates the position right before the final move (always legal/
+    non-terminal, unlike the actual final position, which may be
+    checkmate) from the user's perspective — a small eval swing there
+    means the user was still in the fight almost to the end.
+    """
+    game = chess.pgn.read_game(io.StringIO(pgn))
+    if game is None:
+        return False
+
+    moves = list(game.mainline_moves())
+    if len(moves) < 2:
+        return False
+
+    board = game.board()
+    for move in moves[:-1]:
+        board.push(move)
+
+    try:
+        eval_cp = oracle.eval_cp(board)
+    except (chess.engine.EngineError, OSError):
+        return False
+
+    eval_user_pov = eval_cp if board.turn == user_color else -eval_cp
+    return abs(eval_user_pov) < threshold_cp
 
 
 def _accuracy_from_losses(losses: list[int]) -> float | None:

@@ -59,11 +59,35 @@ create policy "personalization_state: read own" on public.personalization_state
   for select using (auth.uid() = user_id);
 
 -- Auto-create a profile row the moment someone signs up, so the frontend
--- never has to remember to do it manually.
+-- never has to remember to do it manually. Seeds `strength` from whichever
+-- starting difficulty they picked at signup (frontend/app/signup/page.tsx),
+-- keeping it in sync with DifficultyController.STARTING_DIFFICULTY_MAP —
+-- update both places together if that map ever changes.
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  -- raw_user_meta_data is client-supplied (anyone can call the signup API
+  -- directly with arbitrary metadata, not just through our own signup
+  -- form) — validate against the same set profiles.starting_difficulty's
+  -- CHECK constraint allows, or a bogus value here would fail the insert
+  -- below and block signup entirely.
+  chosen_difficulty text := case new.raw_user_meta_data->>'starting_difficulty'
+    when 'beginner' then 'beginner'
+    when 'casual' then 'casual'
+    when 'club' then 'club'
+    when 'strong' then 'strong'
+    else 'casual'
+  end;
+  initial_strength real := case chosen_difficulty
+    when 'beginner' then 0.15
+    when 'casual' then 0.30
+    when 'club' then 0.50
+    when 'strong' then 0.70
+    else 0.30
+  end;
 begin
-  insert into public.profiles (id, full_name) values (new.id, new.raw_user_meta_data->>'full_name');
+  insert into public.profiles (id, full_name, starting_difficulty, strength)
+    values (new.id, new.raw_user_meta_data->>'full_name', chosen_difficulty, initial_strength);
   insert into public.personalization_state (user_id) values (new.id);
   return new;
 end;

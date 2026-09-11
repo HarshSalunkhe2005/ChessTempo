@@ -44,6 +44,7 @@ export interface Motif {
 export interface HintResponse {
   motifs: Motif[];
   eval_cp: number | null;
+  eval_label: string | null;
 }
 
 export interface ProfileResponse {

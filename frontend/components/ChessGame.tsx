@@ -453,6 +453,7 @@ export default function ChessGame() {
 
           {hint ? (
             <div className="hint-panel">
+              {hint.eval_label && <p className="hint-eval">{hint.eval_label}</p>}
               {hint.eval_cp !== null && <p className="hint-eval">Eval: {(hint.eval_cp / 100).toFixed(2)}</p>}
               {hint.motifs.length === 0 && <p>Nothing jumps out — solid position.</p>}
               {hint.motifs.map((m, i) => (

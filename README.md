@@ -44,7 +44,20 @@ Lichess game archives ──► data pipeline ──► base model (plays "human
 
 ## Status
 
-Early scaffolding — see `docs/PLAN.md` for the phased build order.
+Feature-complete against `docs/PLAN.md`'s phased build order: base model
+training pipeline, personalization (per-user game logging + automatic
+fine-tune cadence), difficulty auto-adjustment (wired to real game outcomes
+and closeness), the hint/motif layer (six tactical motifs, verbosity scaled
+to skill level), and the full web app (auth, board, hints, game review,
+profile/history).
+
+What's *not* done, on purpose: the committed checkpoint
+(`checkpoints/tempo_best.pt`, not in git — see "Getting training data"
+below) comes from a small, fast training run meant to prove the pipeline
+end-to-end, not a Maia-scale one — see `docs/PLAN.md` Phase 1 for the real
+bar and how to get there. And it isn't deployed anywhere; see "Deploying
+for free" below for that step, which needs your own Render/Vercel/Supabase
+accounts.
 
 ## Project layout
 
@@ -106,11 +119,24 @@ trade-offs (e.g. Render's free tier sleeps when idle).
 **Note:** the backend needs a trained model checkpoint to actually play
 well — without one it falls back to a randomly-initialized model (functional,
 just not good) so the API doesn't crash. See "Getting training data" and
-`docs/PLAN.md` Phase 1 for training your own, then set
-`MODEL_CHECKPOINT_PATH` to point at it once deployed (the checkpoint file
-itself isn't committed to git — it's a large binary artifact — so decide
-how you want to ship it to the backend, e.g. Supabase Storage or Git LFS,
-once you have one worth deploying).
+`docs/PLAN.md` Phase 1 for training your own — the checkpoint file itself
+isn't committed to git (it's a large binary artifact), so once you have one
+worth deploying, get it to the backend one of two ways:
+1. Upload it into the deployed container/disk directly and point
+   `MODEL_CHECKPOINT_PATH` at it, or
+2. Put it somewhere with a URL (e.g. a Supabase Storage public or signed
+   URL) and set `MODEL_CHECKPOINT_URL` — the backend downloads and caches
+   it on first use if `MODEL_CHECKPOINT_PATH` doesn't already exist.
+
+**Personalization note:** per-user fine-tuned checkpoints
+(`PERSONALIZATION_CHECKPOINT_DIR`, default `checkpoints/personalized/`) and
+their game-shard history (`PERSONALIZATION_DATA_DIR`, default
+`data/users/`) live on the backend's local disk. That's fine for a single
+long-running instance, but Render's free tier has an *ephemeral*
+filesystem — that data is wiped on every restart/redeploy. Fine for
+demoing; if you want personalization to actually persist there, you need a
+paid Render persistent disk (or move that storage to something like
+Supabase Storage — not implemented here).
 
 ## Local Python setup (for training/data work)
 

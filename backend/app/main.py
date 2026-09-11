@@ -11,18 +11,20 @@ from __future__ import annotations
 import logging
 
 import chess
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from tempo.mentor.difficulty import DifficultyController
+from tempo.mentor.hints import build_hint_payload
 from tempo.mentor.motifs import detect_motifs
-from tempo.mentor.review import review_game
+from tempo.mentor.review import estimate_game_closeness, review_game
 from tempo.game.play import TempoPlayer
 
 from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
 from app.model_singleton import get_model, get_oracle
+from app.personalization import USER_COLOR, handle_finished_game
 from app.schemas import (
     FinishGameRequest,
     GameSummary,
@@ -90,7 +92,7 @@ def make_move(req: MoveRequest, user_id: str = Depends(get_current_user_id)):
     difficulty = DifficultyController(strength=profile["strength"])
 
     bot_color = board.turn  # the side about to move is the bot, by construction
-    player = TempoPlayer(model=get_model(), difficulty=difficulty, oracle=get_oracle())
+    player = TempoPlayer(model=get_model(user_id), difficulty=difficulty, oracle=get_oracle())
     move = player.choose_move(board)
     board.push(move)
 
@@ -113,35 +115,49 @@ def make_move(req: MoveRequest, user_id: str = Depends(get_current_user_id)):
 
 @app.post("/game/hint", response_model=HintResponse)
 def get_hint(req: MoveRequest, user_id: str = Depends(get_current_user_id)):
-    """Tactical motifs + eval for the current position, in human terms."""
+    """Tactical motifs + eval for the current position, in human terms —
+    scaled to the user's current skill estimate (tempo.mentor.hints)."""
     try:
         board = chess.Board(req.fen)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid FEN")
 
+    profile = _get_profile(user_id)
     motifs = detect_motifs(board)
     oracle = get_oracle()
     eval_cp = oracle.eval_cp(board) if oracle else None
 
+    payload = build_hint_payload(motifs, eval_cp, profile["strength"])
     return HintResponse(
-        motifs=[{"name": m.name, "square": chess.square_name(m.square), "description": m.description} for m in motifs],
-        eval_cp=eval_cp,
+        motifs=[
+            {"name": m.name, "square": chess.square_name(m.square), "description": m.description}
+            for m in payload.motifs
+        ],
+        eval_cp=payload.eval_cp,
+        eval_label=payload.eval_label,
     )
 
 
 @app.post("/game/finish")
-def finish_game(req: FinishGameRequest, user_id: str = Depends(get_current_user_id)):
-    """Log the finished game and update the user's difficulty strength —
-    the DDA update described in tempo.mentor.difficulty."""
+def finish_game(req: FinishGameRequest, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user_id)):
+    """Log the finished game, update the user's difficulty strength (the
+    DDA update described in tempo.mentor.difficulty), and kick off
+    personalization bookkeeping (tempo.mentor.personalization) in the
+    background so this request doesn't wait on it."""
     if req.result not in ("user_win", "user_loss", "draw"):
         raise HTTPException(status_code=400, detail="Invalid result")
 
     sb = get_supabase()
     profile = _get_profile(user_id)
 
+    oracle = get_oracle()
+    was_close = (
+        estimate_game_closeness(req.pgn, USER_COLOR, oracle) if oracle is not None else False
+    )
+
     controller = DifficultyController(strength=profile["strength"])
     if req.result != "draw":
-        controller.update_after_game(user_won=req.result == "user_win", was_close=False)
+        controller.update_after_game(user_won=req.result == "user_win", was_close=was_close)
 
     sb.table("games").insert(
         {
@@ -153,12 +169,15 @@ def finish_game(req: FinishGameRequest, user_id: str = Depends(get_current_user_
         }
     ).execute()
 
+    games_played = profile["games_played"] + 1
     sb.table("profiles").update(
         {
             "strength": controller.strength,
-            "games_played": profile["games_played"] + 1,
+            "games_played": games_played,
         }
     ).eq("id", user_id).execute()
+
+    background_tasks.add_task(handle_finished_game, user_id, req.pgn, games_played)
 
     return {"new_strength": controller.strength}
 
