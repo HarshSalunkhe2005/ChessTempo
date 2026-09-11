@@ -5,9 +5,11 @@ venv/
 *.egg-info/
 
 # training data and artifacts are large — never commit these (nested dirs
-# included: shard subfolders, per-user personalization data, etc.)
-data/
-checkpoints/
+# included: shard subfolders, per-user personalization data, etc.). Leading
+# slash anchors these to the repo root — src/tempo/data/ is source code,
+# not an artifacts dir, and must stay tracked.
+/data/
+/checkpoints/
 *.pt
 *.ckpt
 
