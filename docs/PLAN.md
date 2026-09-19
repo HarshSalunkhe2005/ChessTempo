@@ -126,6 +126,42 @@ and "Deploying for free" sections.
       new source file from git, and a transitive dependency (`tqdm`) the
       backend needed for the first time once personalization landed but
       `backend/requirements.txt` never listed.
+- [x] Checkpoint actually shipped to the live backend (Supabase Storage,
+      `MODEL_CHECKPOINT_URL`) and verified end-to-end against a real
+      signed-up user (`/game/move` and `/game/hint` both returned real,
+      legal responses from the trained model + Stockfish).
+
+      **Found and fixed a real memory problem in the process:** the first
+      live `/game/move` call OOM-killed the container on Render's free
+      512MB plan — confirmed both from Render logs (checkpoint loads
+      fine, then the process dies with no further output, consistent
+      with a hard kill rather than an app-level error) and from Render's
+      own automated "exceeded its memory limit" alert. Two real causes,
+      not one:
+      1. PyTorch's CPU backend defaults its thread pool to the host's
+         reported core count, which allocates real memory overhead on a
+         tiny instance. Fixed: `OMP_NUM_THREADS` / `MKL_NUM_THREADS` /
+         `OPENBLAS_NUM_THREADS` pinned to 1 before torch initializes
+         (`backend/app/main.py`), plus `torch.set_num_threads(1)`.
+      2. Plain `pip install torch` on Linux resolves to the CUDA-enabled
+         build by default, bundling several hundred MB of unused
+         `nvidia-*` runtime packages onto a box with no GPU. Fixed:
+         install from PyTorch's CPU-only wheel index in
+         `backend/Dockerfile` before the rest of the requirements.
+
+      **Still true after both fixes — read before assuming this is fully
+      solved:** measured memory after the fix sits around 456MB of the
+      512MB limit after a single inference call (Render's own metrics,
+      `get_metrics` on the service). That's a thin margin, not a wide
+      one. `tempo.mentor.personalization`'s background fine-tune job
+      loads a second full model copy plus an AdamW optimizer's worth of
+      gradient state on top of whatever the request path is already
+      holding — a real, not-yet-tested risk of the *same* OOM once a
+      real user reaches the 10-game fine-tune threshold. If that
+      happens: the fix is almost certainly Render's paid tier (more
+      RAM), not more code — this is a resource ceiling, not a leak.
+      Deliberately not making that upgrade call here; it costs money and
+      is yours to decide, not something to do silently on your behalf.
 
 ## Open questions to revisit
 - How much of a user's game history is "enough" before the first
