@@ -14,7 +14,15 @@ COPY pyproject.toml requirements.txt ./
 COPY src ./src
 COPY backend ./backend
 
-RUN pip install --no-cache-dir -e . \
+# Plain `pip install torch` on Linux pulls the CUDA-enabled build, which
+# drags in several hundred MB of nvidia-* runtime packages we never use
+# (this box has no GPU) — real weight on a 512MB free-tier instance.
+# Installing the CPU-only wheel first means the later `-r
+# backend/requirements.txt` (which also lists torch, unpinned to a
+# specific build) finds the constraint already satisfied and leaves it
+# alone rather than re-resolving against the default index.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch \
+    && pip install --no-cache-dir -e . \
     && pip install --no-cache-dir -r backend/requirements.txt
 
 ENV STOCKFISH_PATH=/usr/games/stockfish
