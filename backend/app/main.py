@@ -9,6 +9,20 @@ Run locally:
 from __future__ import annotations
 
 import logging
+import os
+
+# Must be set before torch (imported transitively below, via
+# tempo.game.play -> tempo.model.net) initializes its CPU backend.
+# PyTorch's default thread pool sizes itself to the host's *reported*
+# CPU count, which on a memory-constrained free-tier instance (e.g.
+# Render's free plan: 512MB RAM) can allocate enough per-thread buffer
+# overhead on top of everything else running (Stockfish, FastAPI, the
+# checkpoint itself) to get OOM-killed on the very first inference —
+# observed for real on this project's Render deployment. Pinning to a
+# single thread is the standard fix for PyTorch-in-a-small-container.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
 import chess
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException

@@ -29,6 +29,12 @@ class StockfishOracle:
             )
         self.depth = depth
         self._engine = chess.engine.SimpleEngine.popen_uci(path)
+        # Explicit and small rather than relying on Stockfish's own
+        # default — this runs alongside a full PyTorch process on
+        # memory-constrained deployments (e.g. Render's free 512MB plan),
+        # and the oracle only ever needs single-line/eval-depth analysis,
+        # not a large transposition table.
+        self._engine.configure({"Hash": 16, "Threads": 1})
 
     def best_lines(self, board: chess.Board, num_lines: int = 3) -> list[EngineLine]:
         infos = self._engine.analyse(board, chess.engine.Limit(depth=self.depth), multipv=num_lines)

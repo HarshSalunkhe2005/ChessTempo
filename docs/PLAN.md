@@ -116,10 +116,16 @@ and "Deploying for free" sections.
       it once at first use and caches it on disk. Point it at a Supabase
       Storage public/signed URL, or leave it unset and upload the
       checkpoint to the server by hand.
-- [ ] Deploy for real: Render (backend) + Vercel (frontend) + Supabase, and
-      confirm the full loop works end-to-end against a live checkpoint —
-      needs real accounts on those services; see the README's "Deploying
-      for free" section for the steps.
+- [x] Deploy for real: backend live on Render
+      (`https://chesstempo-api.onrender.com`, Docker, auto-deploys on push
+      to `main`), Supabase project restored and schema current, frontend
+      pushed to `main` for Vercel's git integration to pick up. Two real
+      deploy-time bugs surfaced and fixed in the process (not caught by
+      local tests, since neither reproduces outside a from-scratch Docker
+      build): an unanchored `.gitignore` pattern that silently dropped a
+      new source file from git, and a transitive dependency (`tqdm`) the
+      backend needed for the first time once personalization landed but
+      `backend/requirements.txt` never listed.
 
 ## Open questions to revisit
 - How much of a user's game history is "enough" before the first

@@ -837,6 +837,69 @@ form .field:nth-of-type(3) {
   margin: 0 auto;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  /* Ambient drift on the background glyphs — a slow, self-running loop
+     (not tied to scroll or cursor) so the hero doesn't sit completely
+     still, without needing a video asset. */
+  .glyph {
+    animation: glyph-drift 24s ease-in-out infinite;
+  }
+  .glyph-king {
+    animation-delay: -10s; /* offset so both glyphs don't drift in sync */
+  }
+
+  @keyframes glyph-drift {
+    0%,
+    100% {
+      transform: rotate(var(--rot, 0deg)) translateY(0);
+    }
+    50% {
+      transform: rotate(calc(var(--rot, 0deg) + 2deg)) translateY(-16px);
+    }
+  }
+
+  /* Reuses the same field-in entrance already used on the auth forms, so
+     the hero's first paint feels consistent with the rest of the app. */
+  .hero-content > * {
+    animation: field-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  .hero-content > *:nth-child(1) {
+    animation-delay: 0.05s;
+  }
+  .hero-content > *:nth-child(2) {
+    animation-delay: 0.16s;
+  }
+  .hero-content > *:nth-child(3) {
+    animation-delay: 0.27s;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* Each feature card fades/slides in as it scrolls into view, instead
+       of all four appearing at once — scroll-driven via the native CSS
+       Scroll-Driven Animations API, no JS/IntersectionObserver needed.
+       Unsupported browsers (~16% as of late 2026) fall through to the
+       plain, always-visible .feature-card rule above. */
+    .feature-card {
+      animation: feature-reveal 1s linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 35%;
+    }
+
+    @keyframes feature-reveal {
+      from {
+        opacity: 0;
+        transform: translateY(28px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  }
+}
+
 .hero h1 {
   font-size: 42px;
   line-height: 1.15;

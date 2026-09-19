@@ -22,6 +22,13 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Belt-and-suspenders alongside the OMP/MKL env vars set in app.main
+# (which must land before torch's C extension initializes) — this model
+# is small enough that single-threaded CPU inference costs nothing
+# noticeable in latency, while multi-threaded defaults cost real memory
+# on a constrained instance.
+torch.set_num_threads(1)
+
 _model_cache: dict[str, TempoNet] = {}
 _model_mtime: dict[str, float] = {}
 _oracle: StockfishOracle | None = None
