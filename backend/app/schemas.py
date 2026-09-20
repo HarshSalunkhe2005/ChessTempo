@@ -39,6 +39,7 @@ class GameSummary(BaseModel):
     strength_at_start: float
     strength_at_end: float
     created_at: str
+    pgn: str
 
 
 class ProfileStats(BaseModel):

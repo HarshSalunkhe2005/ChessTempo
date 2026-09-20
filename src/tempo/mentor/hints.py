@@ -50,18 +50,23 @@ class HintPayload:
 
 def build_hint_payload(motifs: list[Motif], eval_cp: int | None, strength: float) -> HintPayload:
     """Scale what a hint shows based on `strength` (0-1, the difficulty
-    controller's current estimate of this user's skill):
+    controller's current estimate of this user's skill).
 
-    - Low strength (beginner): plain-language eval only, capped to the
-      single most concrete motif so it doesn't overwhelm.
-    - Mid strength: plain-language eval *and* the raw number, all motifs.
-    - High strength: just the raw number — players at this level don't
-      need "Slightly better" spelled out — plus all motifs.
+    `eval_cp` is always returned, at every strength — it drives the
+    frontend's eval bar, which is a graphical, at-a-glance read (not "a
+    raw eval number" in the sense the README's design goal warns about)
+    and every real chess site shows it regardless of the viewer's rating.
+    What actually scales with strength:
+
+    - Low strength (beginner): plain-language eval label alongside the
+      number, capped to the single most concrete motif so the tactics
+      list doesn't overwhelm.
+    - Mid strength: plain-language eval label, all motifs.
+    - High strength: no label — players at this level don't need
+      "Slightly better" spelled out — plus all motifs.
     """
-    label = eval_label(eval_cp)
-
-    if strength < _LOW_STRENGTH_CUTOFF:
-        return HintPayload(motifs=motifs[:1], eval_cp=None, eval_label=label)
-    if strength < _MID_STRENGTH_CUTOFF:
-        return HintPayload(motifs=motifs, eval_cp=eval_cp, eval_label=label)
-    return HintPayload(motifs=motifs, eval_cp=eval_cp, eval_label=None)
+    return HintPayload(
+        motifs=motifs[:1] if strength < _LOW_STRENGTH_CUTOFF else motifs,
+        eval_cp=eval_cp,
+        eval_label=eval_label(eval_cp) if strength < _MID_STRENGTH_CUTOFF else None,
+    )

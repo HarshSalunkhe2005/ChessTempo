@@ -66,19 +66,21 @@ def test_get_profile_404_when_missing(client, fake_db):
     assert resp.status_code == 404
 
 
-def test_hint_hides_eval_number_for_beginner(client, fake_db, monkeypatch):
+def test_hint_caps_motifs_for_beginner(client, fake_db, monkeypatch):
     fake_db.data["profiles"][0]["strength"] = 0.1  # beginner tier
 
     monkeypatch.setattr(main, "get_oracle", lambda: _FakeOracle(eval_cp=250))
 
     # White to move with an undefended knight on d4 (attacked by the e5
     # pawn) — a hanging-piece motif for White to watch out for, so this
-    # also exercises the "capped to one motif" behavior below.
+    # also exercises the "capped to one motif" behavior below. eval_cp
+    # always comes through regardless of strength — it drives the
+    # frontend's eval bar for every user, not just higher-strength ones.
     board = chess.Board("4k3/8/8/4p3/3N4/8/8/4K3 w - - 0 1")
     resp = client.post("/game/hint", json={"fen": board.fen()})
     assert resp.status_code == 200
     body = resp.json()
-    assert body["eval_cp"] is None
+    assert body["eval_cp"] == 250
     assert body["eval_label"] == "Slightly better"
     assert len(body["motifs"]) <= 1
 

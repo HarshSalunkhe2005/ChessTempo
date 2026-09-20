@@ -6,6 +6,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { api, GameSummary, ProfileResponse, ProfileStats } from "@/lib/api";
 import { DIFFICULTY_LABELS, initials, strengthToRating } from "@/lib/chessDisplay";
+import { setReviewHandoff } from "@/lib/reviewHandoff";
+import RatingChart from "@/components/RatingChart";
 
 const RESULT_LABEL: Record<string, { text: string; color: string }> = {
   user_win: { text: "Win", color: "var(--success)" },
@@ -112,6 +114,13 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {games.length > 1 && (
+          <div className="panel-card" style={{ marginTop: 32 }}>
+            <div className="status-eyebrow">Rating over time</div>
+            <RatingChart games={games} />
+          </div>
+        )}
+
         <div className="move-list" style={{ marginTop: 32 }}>
           <h3>Recent games</h3>
           <div className="move-list-body" style={{ maxHeight: "none" }}>
@@ -121,6 +130,12 @@ export default function ProfilePage() {
               return (
                 <div
                   key={g.id}
+                  className="move-san-clickable"
+                  onClick={() => {
+                    setReviewHandoff({ pgn: g.pgn, result: g.result });
+                    router.push("/play");
+                  }}
+                  title="Click to review this game move by move"
                   style={{
                     display: "flex",
                     justifyContent: "space-between",

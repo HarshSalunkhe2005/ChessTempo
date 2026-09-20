@@ -202,7 +202,7 @@ def list_games(user_id: str = Depends(get_current_user_id), limit: int = 20):
     sb = get_supabase()
     resp = (
         sb.table("games")
-        .select("id, result, strength_at_start, strength_at_end, created_at")
+        .select("id, result, strength_at_start, strength_at_end, created_at, pgn")
         .eq("user_id", user_id)
         .order("created_at", desc=True)
         .limit(limit)

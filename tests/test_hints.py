@@ -15,9 +15,12 @@ def test_eval_label_buckets():
     assert eval_label(-1000) == "Losing badly"
 
 
-def test_low_strength_hides_number_and_caps_motifs():
+def test_low_strength_shows_number_and_caps_motifs():
+    # eval_cp always comes through — it drives the eval bar, which is
+    # graphical/at-a-glance, not "a raw number" — only the tactics list
+    # and plain-language label scale with strength.
     payload = build_hint_payload(MOTIFS, eval_cp=250, strength=0.1)
-    assert payload.eval_cp is None
+    assert payload.eval_cp == 250
     assert payload.eval_label == "Slightly better"
     assert len(payload.motifs) == 1
 

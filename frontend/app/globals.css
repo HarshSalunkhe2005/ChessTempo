@@ -600,6 +600,38 @@ form .field:nth-of-type(3) {
   letter-spacing: 0.03em;
 }
 
+.move-san-clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s ease;
+}
+
+.move-san-clickable:hover {
+  background: rgba(217, 164, 65, 0.12);
+}
+
+.move-san-active {
+  background: rgba(217, 164, 65, 0.22);
+}
+
+.review-nav {
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.review-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.review-move-detail {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
 .side-panel {
   flex: 1;
   min-width: 260px;

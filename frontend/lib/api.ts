@@ -60,6 +60,7 @@ export interface GameSummary {
   strength_at_start: number;
   strength_at_end: number;
   created_at: string;
+  pgn: string;
 }
 
 export interface ProfileStats {
