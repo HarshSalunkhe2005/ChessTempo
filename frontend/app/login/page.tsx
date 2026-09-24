@@ -18,6 +18,8 @@ export default function LoginPage() {
   // per the "needs real accounts" ask.
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +42,21 @@ export default function LoginPage() {
     setMagicLinkLoading(false);
     if (error) setError(error.message);
     else setMagicLinkSent(true);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError("Enter your email above first.");
+      return;
+    }
+    setError(null);
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetLoading(false);
+    if (error) setError(error.message);
+    else setResetSent(true);
   };
 
   return (
@@ -75,6 +92,19 @@ export default function LoginPage() {
             {loading ? "Logging in..." : "Log in"}
           </button>
           {error && <p className="error-text">{error}</p>}
+          {resetSent ? (
+            <p className="hint-eval">If that email has an account, a reset link is on its way.</p>
+          ) : (
+            <button
+              type="button"
+              className="btn-link"
+              style={{ fontSize: 13, marginTop: 10 }}
+              onClick={handleForgotPassword}
+              disabled={resetLoading}
+            >
+              {resetLoading ? "Sending..." : "Forgot password?"}
+            </button>
+          )}
         </form>
 
         <div className="divider">or</div>

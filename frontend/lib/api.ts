@@ -80,6 +80,29 @@ export interface MoveReviewItem {
   eval_cp: number | null;
 }
 
+export interface OpeningStat {
+  name: string;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+}
+
+export interface ProfileInsights {
+  streak: {
+    current_result: "user_win" | "user_loss" | "draw" | null;
+    current_length: number;
+    best_win_streak: number;
+  };
+  avg_moves_per_game: number | null;
+  openings: OpeningStat[];
+  personalization: {
+    last_finetuned_at: string | null;
+    games_until_next_tune: number;
+    model_active: boolean;
+  };
+}
+
 export interface ReviewResponse {
   moves: MoveReviewItem[];
   accuracy_white: number | null;
@@ -92,6 +115,13 @@ export const api = {
   getGames: (): Promise<GameSummary[]> => authedFetch("/games"),
 
   getProfileStats: (): Promise<ProfileStats> => authedFetch("/profile/stats"),
+
+  getProfileInsights: (): Promise<ProfileInsights> => authedFetch("/profile/insights"),
+
+  updateProfile: (body: { full_name?: string; starting_difficulty?: string }): Promise<ProfileResponse> =>
+    authedFetch("/profile", { method: "PATCH", body: JSON.stringify(body) }),
+
+  deleteAccount: (): Promise<{ deleted: boolean }> => authedFetch("/profile", { method: "DELETE" }),
 
   requestBotMove: (fen: string): Promise<MoveResponse> =>
     authedFetch("/game/move", { method: "POST", body: JSON.stringify({ fen }) }),

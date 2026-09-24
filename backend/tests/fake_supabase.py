@@ -72,10 +72,26 @@ class FakeTable:
         raise AssertionError("FakeTable.execute() called without select/insert/update first")
 
 
+class _FakeAdmin:
+    def __init__(self, client: "FakeSupabase"):
+        self._client = client
+
+    def delete_user(self, user_id: str) -> None:
+        self._client.calls.append(("auth.admin.delete_user", user_id))
+
+
+class _FakeAuth:
+    def __init__(self, client: "FakeSupabase"):
+        self.admin = _FakeAdmin(client)
+
+
 @dataclass
 class FakeSupabase:
     data: dict = field(default_factory=dict)
     calls: list = field(default_factory=list)
+
+    def __post_init__(self):
+        self.auth = _FakeAuth(self)
 
     def table(self, name: str) -> FakeTable:
         return FakeTable(name, self)

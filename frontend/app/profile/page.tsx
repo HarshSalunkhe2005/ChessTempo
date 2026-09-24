@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { api, GameSummary, ProfileResponse, ProfileStats } from "@/lib/api";
+import { api, GameSummary, ProfileInsights, ProfileResponse, ProfileStats } from "@/lib/api";
 import { DIFFICULTY_LABELS, initials, strengthToRating } from "@/lib/chessDisplay";
 import { setReviewHandoff } from "@/lib/reviewHandoff";
 import RatingChart from "@/components/RatingChart";
@@ -15,12 +15,34 @@ const RESULT_LABEL: Record<string, { text: string; color: string }> = {
   draw: { text: "Draw", color: "var(--text-dim)" },
 };
 
+function streakLabel(streak: ProfileInsights["streak"]): string {
+  if (!streak.current_result || streak.current_length === 0) return "—";
+  const kind = streak.current_result === "user_win" ? "W" : streak.current_result === "user_loss" ? "L" : "D";
+  return `${streak.current_length}${kind}`;
+}
+
+function milestones(stats: ProfileStats, insights: ProfileInsights) {
+  return [
+    { label: "First game", hint: "Play a game", done: stats.total_games >= 1 },
+    { label: "First win", hint: "Beat the bot once", done: stats.wins >= 1 },
+    { label: "Regular", hint: "Play 10 games", done: stats.total_games >= 10 },
+    { label: "Veteran", hint: "Play 25 games", done: stats.total_games >= 25 },
+    { label: "Hot streak", hint: "Win 3 in a row", done: insights.streak.best_win_streak >= 3 },
+    {
+      label: "Known quantity",
+      hint: "Your bot adapts to your style",
+      done: insights.personalization.last_finetuned_at != null,
+    },
+  ];
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [games, setGames] = useState<GameSummary[]>([]);
+  const [insights, setInsights] = useState<ProfileInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,6 +59,7 @@ export default function ProfilePage() {
           setGames(g);
         })
         .catch((e) => setError(e.message));
+      api.getProfileInsights().then(setInsights).catch(() => {});
     });
   }, [router]);
 
@@ -52,6 +75,9 @@ export default function ProfilePage() {
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <Link href="/play" className="btn-link" style={{ textDecoration: "none" }}>
             Play
+          </Link>
+          <Link href="/settings" className="btn-link" style={{ textDecoration: "none" }}>
+            Settings
           </Link>
           <button
             className="btn-link"
@@ -112,6 +138,85 @@ export default function ProfilePage() {
               <div className="stat-tile-label">Win rate</div>
             </div>
           </div>
+        )}
+
+        {insights && stats && (
+          <>
+            <div className="stat-grid" style={{ marginTop: 16 }}>
+              <div className="stat-tile">
+                <div className="stat-tile-value">{streakLabel(insights.streak)}</div>
+                <div className="stat-tile-label">Current streak</div>
+              </div>
+              <div className="stat-tile">
+                <div className="stat-tile-value">{insights.streak.best_win_streak}</div>
+                <div className="stat-tile-label">Best win streak</div>
+              </div>
+              <div className="stat-tile">
+                <div className="stat-tile-value">{insights.avg_moves_per_game ?? "—"}</div>
+                <div className="stat-tile-label">Avg. moves / game</div>
+              </div>
+            </div>
+
+            <div className="panel-card" style={{ marginTop: 24 }}>
+              <div className="status-eyebrow">Your bot</div>
+              <p style={{ margin: "0 0 4px", fontSize: 15 }}>
+                {insights.personalization.last_finetuned_at
+                  ? insights.personalization.model_active
+                    ? "Your bot has adapted to your play style."
+                    : "Your bot was adapted to your style, but its personalized model isn't loaded right now (the server restarted) — it'll rebuild after your next few games."
+                  : "Your bot hasn't adapted to you yet."}
+              </p>
+              <p className="hint-eval" style={{ margin: 0 }}>
+                {insights.personalization.games_until_next_tune === 0
+                  ? "Next game triggers a personalization update."
+                  : `${insights.personalization.games_until_next_tune} more game${
+                      insights.personalization.games_until_next_tune === 1 ? "" : "s"
+                    } until its next update.`}
+                {insights.personalization.last_finetuned_at &&
+                  ` Last updated ${new Date(insights.personalization.last_finetuned_at).toLocaleDateString()}.`}
+              </p>
+            </div>
+
+            {insights.openings.length > 0 && (
+              <div className="move-list" style={{ marginTop: 24 }}>
+                <h3>Openings you reach</h3>
+                <div className="move-list-body" style={{ maxHeight: "none" }}>
+                  {insights.openings.map((o) => (
+                    <div
+                      key={o.name}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        padding: "10px 6px",
+                        borderBottom: "1px solid var(--border)",
+                        fontSize: 14,
+                      }}
+                    >
+                      <span style={{ fontWeight: 600 }}>{o.name}</span>
+                      <span className="hint-eval">
+                        {o.games} game{o.games === 1 ? "" : "s"} ·{" "}
+                        <span style={{ color: "var(--success)" }}>{o.wins}W</span>{" "}
+                        <span>{o.draws}D</span>{" "}
+                        <span style={{ color: "var(--danger)" }}>{o.losses}L</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="panel-card" style={{ marginTop: 24 }}>
+              <div className="status-eyebrow">Milestones</div>
+              <div className="milestone-grid">
+                {milestones(stats, insights).map((m) => (
+                  <div key={m.label} className={`milestone${m.done ? "" : " milestone-locked"}`} title={m.hint}>
+                    <div className="milestone-label">{m.label}</div>
+                    <div className="milestone-hint">{m.hint}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
         )}
 
         {games.length > 1 && (

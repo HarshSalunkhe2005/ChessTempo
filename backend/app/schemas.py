@@ -51,6 +51,40 @@ class ProfileStats(BaseModel):
     current_strength: float
 
 
+class UpdateProfileRequest(BaseModel):
+    full_name: str | None = None
+    starting_difficulty: str | None = None  # resets strength to that tier's starting value
+
+
+class OpeningStatOut(BaseModel):
+    name: str
+    games: int
+    wins: int
+    draws: int
+    losses: int
+
+
+class StreakInfo(BaseModel):
+    current_result: str | None = None  # "user_win" | "user_loss" | "draw" | None
+    current_length: int = 0
+    best_win_streak: int = 0
+
+
+class PersonalizationInfo(BaseModel):
+    last_finetuned_at: str | None = None
+    games_until_next_tune: int
+    # False after a backend restart on ephemeral disk even if a tune ran
+    # earlier — the DB row remembers, the checkpoint file may not.
+    model_active: bool
+
+
+class ProfileInsights(BaseModel):
+    streak: StreakInfo
+    avg_moves_per_game: float | None = None
+    openings: list[OpeningStatOut]
+    personalization: PersonalizationInfo
+
+
 class ReviewRequest(BaseModel):
     pgn: str
 

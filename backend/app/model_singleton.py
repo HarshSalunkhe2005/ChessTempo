@@ -92,6 +92,13 @@ def get_model(user_id: str | None = None) -> TempoNet:
     return _load_from_cache_or_disk(str(base_path), base_path)
 
 
+def evict_user_model(user_id: str) -> None:
+    """Drop a deleted user's cached personalized model from memory."""
+    key = str(Path(settings.personalization_checkpoint_dir) / f"{user_id}.pt")
+    _model_cache.pop(key, None)
+    _model_mtime.pop(key, None)
+
+
 def get_oracle() -> StockfishOracle | None:
     global _oracle
     if _oracle is None:

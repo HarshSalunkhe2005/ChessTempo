@@ -138,3 +138,46 @@ class _FakeOracle:
 
     def eval_cp(self, board):
         return self._eval_cp
+
+
+def test_update_profile_name_and_difficulty_resets_strength(client, fake_db):
+    resp = client.patch("/profile", json={"full_name": "  New Name  ", "starting_difficulty": "beginner"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["full_name"] == "New Name"
+    assert body["starting_difficulty"] == "beginner"
+    assert body["strength"] == 0.15  # reset to the beginner tier, not just relabelled
+
+
+def test_update_profile_rejects_bad_input(client, fake_db):
+    assert client.patch("/profile", json={}).status_code == 400
+    assert client.patch("/profile", json={"full_name": "   "}).status_code == 400
+    assert client.patch("/profile", json={"starting_difficulty": "grandmaster"}).status_code == 400
+
+
+def test_delete_account_removes_auth_user(client, fake_db):
+    resp = client.delete("/profile")
+    assert resp.status_code == 200
+    assert ("auth.admin.delete_user", USER_ID) in fake_db.calls
+
+
+def test_profile_insights(client, fake_db):
+    # newest first, as the endpoint's descending query would return them
+    fake_db.data["games"] = [
+        {"pgn": "1. e4 c5 2. Nf3 d6 *", "result": "user_loss", "created_at": "3"},
+        {"pgn": "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *", "result": "user_win", "created_at": "2"},
+        {"pgn": "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *", "result": "user_win", "created_at": "1"},
+    ]
+    fake_db.data["games"] = [dict(g, user_id=USER_ID) for g in fake_db.data["games"]]
+
+    resp = client.get("/profile/insights")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["streak"] == {"current_result": "user_loss", "current_length": 1, "best_win_streak": 2}
+    assert body["openings"][0]["name"] == "Ruy Lopez"
+    assert body["openings"][0]["wins"] == 2
+    assert body["avg_moves_per_game"] is not None
+    # profile fixture has games_played=3 and 0 games at last tune -> 7 to go
+    assert body["personalization"]["games_until_next_tune"] == 7
+    assert body["personalization"]["model_active"] is False

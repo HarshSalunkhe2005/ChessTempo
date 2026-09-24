@@ -8,6 +8,7 @@ import { api, HintResponse, ProfileResponse, ReviewResponse } from "@/lib/api";
 import { supabase } from "@/lib/supabaseClient";
 import { DIFFICULTY_LABELS, toFigurine, strengthToRating, initials, CLASSIFICATION_COLOR } from "@/lib/chessDisplay";
 import { takeReviewHandoff } from "@/lib/reviewHandoff";
+import { clearActiveGame, loadActiveGame, saveActiveGame } from "@/lib/activeGame";
 
 const PIECE_GLYPH: Record<string, string> = {
   p: "♟",
@@ -116,10 +117,17 @@ export default function ChessGame() {
 
   useEffect(loadProfile, [loadProfile, gameKey]);
 
+  // Only the most recently requested position's eval may update the bar —
+  // responses can arrive out of order (e.g. the fresh-board request vs. a
+  // resumed game's), and a stale one would show the wrong position's eval.
+  const latestEvalFen = useRef("");
   const refreshBoardEval = useCallback((fenToEval: string) => {
+    latestEvalFen.current = fenToEval;
     api
       .getHint(fenToEval)
-      .then((res) => setBoardEval(res.eval_cp))
+      .then((res) => {
+        if (latestEvalFen.current === fenToEval) setBoardEval(res.eval_cp);
+      })
       .catch(() => {
         /* the eval bar just stays at its last value — not worth surfacing an error for */
       });
@@ -137,12 +145,14 @@ export default function ChessGame() {
   // an empty dependency array's usual caveats, since this also has to
   // survive React StrictMode's double-invoke in development.
   const didLoadHandoff = useRef(false);
+  const handoffLoaded = useRef(false);
   useEffect(() => {
     if (didLoadHandoff.current) return;
     didLoadHandoff.current = true;
 
     const handoff = takeReviewHandoff();
     if (!handoff) return;
+    handoffLoaded.current = true;
 
     try {
       game.loadPgn(handoff.pgn);
@@ -184,6 +194,7 @@ export default function ChessGame() {
   const endGameIfOver = useCallback(
     async (result: GameResult, reason: string) => {
       if (!result) return;
+      clearActiveGame();
       setGameOver({ result, reason });
       try {
         await api.finishGame(game.pgn(), result);
@@ -224,6 +235,7 @@ export default function ChessGame() {
       setLegalTargets([]);
       setLastMove({ from: move.from as Square, to: move.to as Square });
       refreshBoardEval(game.fen());
+      saveActiveGame(game.pgn());
       return true;
     },
     [game, refreshBoardEval]
@@ -261,6 +273,52 @@ export default function ChessGame() {
     },
     [game, thinking, gameOver, applyMove, endGameIfOver, requestBotReply]
   );
+
+  // Pick up an unfinished game left behind by a closed tab / refresh. A
+  // review handoff from the profile page takes priority over it.
+  const didTryResume = useRef(false);
+  useEffect(() => {
+    if (didTryResume.current) return;
+    didTryResume.current = true;
+    if (handoffLoaded.current) return;
+
+    const saved = loadActiveGame();
+    if (!saved) return;
+
+    try {
+      game.loadPgn(saved);
+    } catch {
+      clearActiveGame();
+      return;
+    }
+    if (game.isGameOver() || game.history().length === 0) {
+      clearActiveGame();
+      game.reset();
+      return;
+    }
+
+    const byUser: string[] = [];
+    const byBot: string[] = [];
+    let last: { from: Square; to: Square } | null = null;
+    for (const m of game.history({ verbose: true })) {
+      if (m.captured) (m.color === "w" ? byUser : byBot).push(m.captured);
+      last = { from: m.from as Square, to: m.to as Square };
+    }
+    setFen(game.fen());
+    setHistory(game.history());
+    setCaptured({ byUser, byBot });
+    setLastMove(last);
+    refreshBoardEval(game.fen());
+
+    // The user always plays White; if it's Black to move, the bot's reply
+    // was still pending when the tab closed.
+    if (game.turn() === "b") {
+      requestBotReply();
+    } else {
+      setStatus("Game resumed — your move.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onSquareClick = useCallback(
     (square: Square) => {
@@ -346,6 +404,7 @@ export default function ChessGame() {
   );
 
   const newGame = useCallback(() => {
+    clearActiveGame();
     setGameKey((k) => k + 1);
     setFen(new Chess().fen());
     setHistory([]);
@@ -431,6 +490,9 @@ export default function ChessGame() {
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <button className="btn-link" onClick={() => router.push("/profile")}>
             Profile
+          </button>
+          <button className="btn-link" onClick={() => router.push("/settings")}>
+            Settings
           </button>
           <button
             className="btn-link"

@@ -28,16 +28,22 @@ import chess
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+
 from tempo.mentor.difficulty import DifficultyController
 from tempo.mentor.hints import build_hint_payload
+from tempo.mentor.insights import average_moves, compute_streaks, summarize_openings
 from tempo.mentor.motifs import detect_motifs
+from tempo.mentor.personalization import games_until_next_finetune
 from tempo.mentor.review import estimate_game_closeness, review_game
 from tempo.game.play import TempoPlayer
 
 from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
-from app.model_singleton import get_model, get_oracle
+from app.model_singleton import evict_user_model, get_model, get_oracle
 from app.personalization import USER_COLOR, handle_finished_game
 from app.schemas import (
     FinishGameRequest,
@@ -46,10 +52,15 @@ from app.schemas import (
     MoveRequest,
     MoveResponse,
     MoveReviewOut,
+    OpeningStatOut,
+    PersonalizationInfo,
+    ProfileInsights,
     ProfileResponse,
     ProfileStats,
     ReviewRequest,
     ReviewResponse,
+    StreakInfo,
+    UpdateProfileRequest,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -87,6 +98,96 @@ def get_profile(user_id: str = Depends(get_current_user_id)):
         strength=profile["strength"],
         games_played=profile["games_played"],
         full_name=profile.get("full_name"),
+    )
+
+
+_VALID_DIFFICULTIES = set(DifficultyController.STARTING_DIFFICULTY_MAP)
+
+
+@app.patch("/profile", response_model=ProfileResponse)
+def update_profile(req: UpdateProfileRequest, user_id: str = Depends(get_current_user_id)):
+    """Edit display name, and/or reset difficulty to a starting tier
+    (which also resets `strength` to that tier's starting value — picking
+    "Beginner" again should actually make the bot easier, not just relabel)."""
+    updates: dict = {}
+
+    if req.full_name is not None:
+        name = req.full_name.strip()
+        if not 1 <= len(name) <= 80:
+            raise HTTPException(status_code=400, detail="Name must be 1-80 characters")
+        updates["full_name"] = name
+
+    if req.starting_difficulty is not None:
+        if req.starting_difficulty not in _VALID_DIFFICULTIES:
+            raise HTTPException(status_code=400, detail="Invalid difficulty")
+        updates["starting_difficulty"] = req.starting_difficulty
+        updates["strength"] = DifficultyController.STARTING_DIFFICULTY_MAP[req.starting_difficulty]
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    sb = get_supabase()
+    _get_profile(user_id)  # 404 if missing
+    sb.table("profiles").update(updates).eq("id", user_id).execute()
+    return get_profile(user_id)
+
+
+@app.delete("/profile")
+def delete_account(user_id: str = Depends(get_current_user_id)):
+    """Permanently delete the account. Removing the auth user cascades to
+    profiles, games and personalization_state via their foreign keys;
+    local personalization data/checkpoints are cleaned up too."""
+    sb = get_supabase()
+    sb.auth.admin.delete_user(user_id)
+
+    shutil.rmtree(Path(settings.personalization_data_dir) / user_id, ignore_errors=True)
+    (Path(settings.personalization_checkpoint_dir) / f"{user_id}.pt").unlink(missing_ok=True)
+    evict_user_model(user_id)
+    return {"deleted": True}
+
+
+@app.get("/profile/insights", response_model=ProfileInsights)
+def get_profile_insights(user_id: str = Depends(get_current_user_id)):
+    """Streaks, opening breakdown, typical game length, and personalization
+    status — everything the profile page shows beyond raw win/loss counts."""
+    sb = get_supabase()
+    profile = _get_profile(user_id)
+
+    rows = (
+        sb.table("games")
+        .select("pgn, result, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(200)
+        .execute()
+        .data
+    )
+    rows = list(reversed(rows))  # chronological
+
+    streaks = compute_streaks([r["result"] for r in rows])
+    openings = summarize_openings([(r["pgn"], r["result"]) for r in rows])
+
+    state = (
+        sb.table("personalization_state").select("*").eq("user_id", user_id).single().execute().data
+    ) or {}
+    checkpoint = Path(settings.personalization_checkpoint_dir) / f"{user_id}.pt"
+
+    return ProfileInsights(
+        streak=StreakInfo(
+            current_result=streaks.current_result,
+            current_length=streaks.current_length,
+            best_win_streak=streaks.best_win_streak,
+        ),
+        avg_moves_per_game=average_moves([r["pgn"] for r in rows]),
+        openings=[OpeningStatOut(**vars(o)) for o in openings],
+        personalization=PersonalizationInfo(
+            last_finetuned_at=state.get("last_finetuned_at"),
+            games_until_next_tune=games_until_next_finetune(
+                profile["games_played"], state.get("games_at_last_finetune", 0)
+            ),
+            model_active=checkpoint.exists(),
+        ),
     )
 
 

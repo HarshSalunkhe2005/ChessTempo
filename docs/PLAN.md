@@ -86,10 +86,12 @@ phase should be individually testable/demoable before moving to the next.
 - [x] Rule-based motif detection: hanging pieces, forks, pins, skewers,
       back-rank weaknesses, discovered-attack threats (`tempo.mentor.motifs`)
 - [x] Hint verbosity scaling based on current difficulty/skill estimate
-      (`tempo.mentor.hints`) — low strength hides the raw eval number in
-      favor of a plain-language read and caps to the single most concrete
-      motif; high strength shows the raw number and drops the plain-
-      language label. Wired into `/game/hint` and the hint panel UI.
+      (`tempo.mentor.hints`) — the eval number is always returned (it
+      drives the eval bar; an earlier version hid it at low strength and
+      froze the bar for most users). What scales with strength: low
+      strength gets a plain-language label and only the single most
+      concrete motif; mid gets the label and all motifs; high drops the
+      label. Wired into `/game/hint` and the hint panel UI.
 - [x] Actual UI/app to play against and view hints in — see Phase 5.
 
 ## Phase 5 — Web app
@@ -162,6 +164,38 @@ and "Deploying for free" sections.
       RAM), not more code — this is a resource ceiling, not a leak.
       Deliberately not making that upgrade call here; it costs money and
       is yours to decide, not something to do silently on your behalf.
+
+## Phase 6 — Profile, tracking and account features
+- [x] Insights on the profile page (`tempo.mentor.insights`, `/profile/insights`):
+      current/best streaks, average game length, the openings the user
+      actually reaches with their W/D/L in each (a small hand-picked
+      opening table with longest-prefix matching, *not* a full ECO
+      database — unmatched games fall back to a coarse first-move label),
+      and milestones derived from existing stats.
+- [x] Personalization status surfaced to the user (it previously ran
+      silently): whether the bot has adapted, games until the next
+      update, last update date, and whether the personalized model is
+      actually loaded right now — the DB remembers a tune even after
+      Render's ephemeral disk loses the checkpoint file, so the UI says
+      so instead of claiming an adapted bot that isn't loaded.
+- [x] Account settings (`/settings`): edit display name, reset difficulty
+      (which really resets `strength` to that tier's start), change
+      password, delete account (removes the auth user, cascading to
+      profile/games/personalization rows, plus local personalization
+      artifacts).
+- [x] Forgot-password flow (login link -> Supabase reset email ->
+      `/reset-password`). **Not verified end-to-end** — that needs a real
+      inbox, and the app's `/reset-password` URL must be in Supabase's
+      Auth -> URL Configuration redirect allow-list or the email link
+      will fall back to the project's Site URL.
+- [x] Resume an unfinished game after a closed tab/refresh
+      (localStorage, per-browser — not synced across devices).
+- [ ] Not built, deliberately: per-color stats (the user always plays
+      White, so it would be meaningless), leaderboards/friends (one bot
+      per user), puzzles, and accuracy-over-time (accuracy is only
+      computed on demand by `/game/review` and isn't persisted per game;
+      persisting it would mean running the slow engine review on every
+      finished game, which the free-tier instance can't afford).
 
 ## Open questions to revisit
 - How much of a user's game history is "enough" before the first
