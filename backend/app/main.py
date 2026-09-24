@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
 
 # Must be set before torch (imported transitively below, via
 # tempo.game.play -> tempo.model.net) initializes its CPU backend.
@@ -28,10 +31,6 @@ import chess
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-import shutil
-from datetime import datetime, timezone
-from pathlib import Path
-
 from tempo.mentor.difficulty import DifficultyController
 from tempo.mentor.hints import build_hint_payload
 from tempo.mentor.insights import average_moves, compute_streaks, summarize_openings
@@ -42,7 +41,7 @@ from tempo.game.play import TempoPlayer
 
 from app.auth import get_current_user_id
 from app.config import settings
-from app.db import get_supabase
+from app.db import get_supabase, single_or_none
 from app.model_singleton import evict_user_model, get_model, get_oracle
 from app.personalization import USER_COLOR, handle_finished_game
 from app.schemas import (
@@ -84,10 +83,10 @@ def health():
 
 def _get_profile(user_id: str) -> dict:
     sb = get_supabase()
-    resp = sb.table("profiles").select("*").eq("id", user_id).single().execute()
-    if not resp.data:
+    profile = single_or_none(sb.table("profiles").select("*").eq("id", user_id).single())
+    if not profile:
         raise HTTPException(status_code=404, detail="Profile not found — did signup trigger fire?")
-    return resp.data
+    return profile
 
 
 @app.get("/profile", response_model=ProfileResponse)
@@ -168,9 +167,7 @@ def get_profile_insights(user_id: str = Depends(get_current_user_id)):
     streaks = compute_streaks([r["result"] for r in rows])
     openings = summarize_openings([(r["pgn"], r["result"]) for r in rows])
 
-    state = (
-        sb.table("personalization_state").select("*").eq("user_id", user_id).single().execute().data
-    ) or {}
+    state = single_or_none(sb.table("personalization_state").select("*").eq("user_id", user_id).single()) or {}
     checkpoint = Path(settings.personalization_checkpoint_dir) / f"{user_id}.pt"
 
     return ProfileInsights(

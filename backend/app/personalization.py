@@ -22,7 +22,7 @@ from tempo.mentor.personalization import (
 )
 
 from app.config import settings
-from app.db import get_supabase
+from app.db import get_supabase, single_or_none
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,7 @@ def handle_finished_game(user_id: str, pgn: str, games_played: int) -> None:
     log_game_for_personalization(pgn, USER_COLOR, shard_dir)
 
     sb = get_supabase()
-    resp = sb.table("personalization_state").select("*").eq("user_id", user_id).single().execute()
-    state = resp.data
+    state = single_or_none(sb.table("personalization_state").select("*").eq("user_id", user_id).single())
     if state is None:
         logger.warning("No personalization_state row for user %s — skipping fine-tune check", user_id)
         return

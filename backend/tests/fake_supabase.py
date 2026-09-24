@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from postgrest.exceptions import APIError
+
 
 @dataclass
 class FakeResponse:
@@ -58,6 +60,15 @@ class FakeTable:
         if self.op == "select":
             matched = self._matching_rows()
             if self.is_single:
+                if not matched and self.client.strict_single:
+                    raise APIError(
+                        {
+                            "message": "JSON object requested, multiple (or no) rows returned",
+                            "code": "PGRST116",
+                            "details": "The result contains 0 rows",
+                            "hint": None,
+                        }
+                    )
                 return FakeResponse(data=matched[0] if matched else None)
             return FakeResponse(data=matched)
         if self.op == "insert":
@@ -89,6 +100,8 @@ class _FakeAuth:
 class FakeSupabase:
     data: dict = field(default_factory=dict)
     calls: list = field(default_factory=list)
+    # True mimics the real client, which raises on zero rows for .single()
+    strict_single: bool = False
 
     def __post_init__(self):
         self.auth = _FakeAuth(self)

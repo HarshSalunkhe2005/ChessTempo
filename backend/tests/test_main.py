@@ -181,3 +181,12 @@ def test_profile_insights(client, fake_db):
     # profile fixture has games_played=3 and 0 games at last tune -> 7 to go
     assert body["personalization"]["games_until_next_tune"] == 7
     assert body["personalization"]["model_active"] is False
+
+
+def test_missing_profile_is_404_not_500_with_real_client_semantics(client, fake_db):
+    # The real supabase client raises on zero rows; a deleted account's
+    # still-valid token used to surface that as a 500.
+    fake_db.strict_single = True
+    fake_db.data["profiles"] = []
+    assert client.get("/profile").status_code == 404
+    assert client.get("/profile/insights").status_code == 404
